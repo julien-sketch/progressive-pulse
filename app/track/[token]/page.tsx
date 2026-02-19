@@ -4,31 +4,59 @@ import React, { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 import { FileUp, MessageCircle, CheckCircle2, Loader2 } from "lucide-react";
 
+type Project = {
+  client_name: string;
+  progress_percent: number;
+  status_text: string;
+  created_at: string | null;
+  broker_email: string;
+  access_token: string;
+  drive_folder_url?: string | null;
+};
+
 export default function ClientTrackPage({ params }: { params: { token: string } }) {
   const supabase = useMemo(() => getSupabaseBrowser(), []);
-  const [project, setProject] = useState<any>(null);
+  const [project, setProject] = useState<Project | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+
   const [uploading, setUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
 
   useEffect(() => {
     const fetchProject = async () => {
-      const { data, error } = await supabase
-        .from("projects")
-        .select("*")
-        .eq("access_token", params.token)
-        .single();
+      setLoading(true);
+      setNotFound(false);
 
-      if (error) {
-        // tu peux afficher un écran d'erreur si tu veux
-        console.error(error);
-        return;
+      try {
+        const res = await fetch(`/api/track/${params.token}`, { cache: "no-store" });
+
+        if (res.status === 404) {
+          setNotFound(true);
+          setProject(null);
+          return;
+        }
+
+        const json = await res.json();
+        if (!res.ok) {
+          console.error(json);
+          setNotFound(true);
+          setProject(null);
+          return;
+        }
+
+        setProject(json.project as Project);
+      } catch (e) {
+        console.error(e);
+        setNotFound(true);
+        setProject(null);
+      } finally {
+        setLoading(false);
       }
-
-      if (data) setProject(data);
     };
 
     fetchProject();
-  }, [params.token, supabase]);
+  }, [params.token]);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -40,7 +68,7 @@ export default function ClientTrackPage({ params }: { params: { token: string } 
     const fileExt = file.name.split(".").pop() || "bin";
     const safeClientName = String(project.client_name || "client")
       .trim()
-      .replace(/[\/\\?#%*:|"<>]/g, "-"); // évite les paths cassés
+      .replace(/[\/\\?#%*:|"<>]/g, "-");
     const fileName = `${safeClientName}/${Date.now()}.${fileExt}`;
 
     const { error } = await supabase.storage
@@ -58,7 +86,7 @@ export default function ClientTrackPage({ params }: { params: { token: string } 
     setTimeout(() => setUploadSuccess(false), 5000);
   };
 
-  if (!project) {
+  if (loading) {
     return (
       <div className="flex h-screen flex-col items-center justify-center bg-[#F5F5F7]">
         <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
@@ -69,10 +97,22 @@ export default function ClientTrackPage({ params }: { params: { token: string } 
     );
   }
 
+  if (notFound || !project) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center bg-[#F5F5F7] px-6 text-center">
+        <div className="max-w-md rounded-3xl bg-white/80 p-8 shadow-2xl shadow-gray-200/50 backdrop-blur-2xl border border-white/40">
+          <h1 className="text-2xl font-bold text-black">Lien invalide</h1>
+          <p className="mt-3 text-sm font-medium text-gray-500">
+            Ce dossier n’existe pas ou n’est plus accessible.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#F5F5F7] px-6 pb-12 pt-16 font-sans text-gray-900">
       <div className="mx-auto max-w-md">
-        {/* Header style Apple */}
         <header className="mb-12 text-center">
           <h1 className="text-3xl font-bold tracking-tight text-black">
             ProgressivePrêt
@@ -82,7 +122,6 @@ export default function ClientTrackPage({ params }: { params: { token: string } 
           </p>
         </header>
 
-        {/* Carte principale */}
         <main className="relative overflow-hidden rounded-[2.5rem] border border-white/40 bg-white/80 p-8 shadow-2xl shadow-gray-200/50 backdrop-blur-2xl">
           <div className="mb-8">
             <h2 className="text-2xl font-semibold leading-tight tracking-tight text-gray-800">
@@ -96,7 +135,6 @@ export default function ClientTrackPage({ params }: { params: { token: string } 
             </p>
           </div>
 
-          {/* Barre de progression Apple Style */}
           <div className="relative mb-4 h-5 w-full overflow-hidden rounded-full bg-gray-100 shadow-inner">
             <div
               className="h-full rounded-full bg-gradient-to-r from-blue-600 via-emerald-400 to-green-400 transition-all duration-1000 ease-out"
@@ -110,7 +148,6 @@ export default function ClientTrackPage({ params }: { params: { token: string } 
             <span>Remise des clés</span>
           </div>
 
-          {/* Actions */}
           <div className="mt-12 space-y-4">
             <label
               className={`flex w-full cursor-pointer items-center justify-center gap-3 rounded-2xl p-4 font-bold transition-all active:scale-95 shadow-lg ${
@@ -155,7 +192,6 @@ export default function ClientTrackPage({ params }: { params: { token: string } 
           </div>
         </main>
 
-        {/* Footer discret */}
         <footer className="mt-16 text-center">
           <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-gray-300">
             Propulsé par ProgressivePulse
