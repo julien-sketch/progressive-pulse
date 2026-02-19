@@ -1,34 +1,43 @@
-export const dynamic = 'force-dynamic';
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { Resend } from 'resend';
-import { supabase } from '@/lib/supabase';
-import { NextResponse } from 'next/server';
-
-const resend = new Resend(process.env.RESEND_API_KEY);
+import { Resend } from "resend";
+import { NextResponse } from "next/server";
+import { getSupabaseServer } from "@/lib/supabase-server";
 
 export async function GET() {
-  // 1. Récupérer tous les projets actifs
-  const { data: projects } = await supabase.from('projects').select('*');
+  const supabase = getSupabaseServer();
+  const resend = new Resend(process.env.RESEND_API_KEY);
 
-  if (!projects) return NextResponse.json({ message: "No projects" });
+  const { data: projects, error } = await supabase
+    .from("projects")
+    .select("*");
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+
+  if (!projects || projects.length === 0) {
+    return NextResponse.json({ message: "No projects" });
+  }
+
+  const baseUrl =
+    process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
 
   for (const project of projects) {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-    
-    // 2. Envoyer l'email avec les liens magiques
     await resend.emails.send({
-      from: 'ProgressivePulse <onboarding@resend.dev>',
+      from: "ProgressivePulse <onboarding@resend.dev>",
       to: project.broker_email,
       subject: `📈 Suivi : ${project.client_name}`,
       html: `
         <h3>Où en est le dossier de ${project.client_name} ?</h3>
-        <p>Cliquez sur l'étape actuelle pour mettre à jour la barre de votre client :</p>
-        <a href="${baseUrl}/api/update/${project.access_token}/25" style="display:block; margin:10px 0; color:#0071e3;">Dossier Completé (25%)</a>
-        <a href="${baseUrl}/api/update/${project.access_token}/50" style="display:block; margin:10px 0; color:#0071e3;">Envoi Banques (50%)</a>
-        <a href="${baseUrl}/api/update/${project.access_token}/75" style="display:block; margin:10px 0; color:#0071e3;">Offre Reçue (75%)</a>
-        <a href="${baseUrl}/api/update/${project.access_token}/100" style="display:block; margin:10px 0; color:#28a745;">Signé ! (100%)</a>
-      `
+        <p>Cliquez sur l'étape actuelle pour mettre à jour la barre :</p>
+        <a href="${baseUrl}/api/update/${project.access_token}/25">25%</a><br/>
+        <a href="${baseUrl}/api/update/${project.access_token}/50">50%</a><br/>
+        <a href="${baseUrl}/api/update/${project.access_token}/75">75%</a><br/>
+        <a href="${baseUrl}/api/update/${project.access_token}/100">100%</a>
+      `,
     });
   }
 
