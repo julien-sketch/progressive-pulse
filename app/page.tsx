@@ -3,7 +3,7 @@ import { CheckCircle2, ArrowRight, ShieldCheck, Clock, Star } from "lucide-react
 
 export default function Home() {
   // REMPLACE PAR TON LIEN REEL GENERÉ SUR STRIPE
-  const STRIPE_LINK = "https://progressive-pulse-snowy.vercel.app/";
+  const STRIPE_LINK = "https://buy.stripe.com/eVq8wQ3kJ7vWc2x58veIw00";
 
   return (
     <div className="min-h-screen bg-zinc-50 font-sans text-zinc-950 selection:bg-blue-100">
