@@ -3,8 +3,15 @@ import ClientTrack from "./ClientTrack";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export default function TrackPage({ params }: { params: { token: string } }) {
-  // Important : on force la valeur en string
-  const token = String(params?.token ?? "");
+type Params = { token: string };
+
+export default async function TrackPage({
+  params,
+}: {
+  params: Params | Promise<Params>;
+}) {
+  const resolved = await Promise.resolve(params);
+  const token = String(resolved?.token ?? "").trim();
+
   return <ClientTrack token={token} />;
 }
