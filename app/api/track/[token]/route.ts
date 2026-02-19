@@ -5,14 +5,28 @@ export const revalidate = 0;
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-export async function GET(_req: Request, context: any) {
-  const token = String(context.params.token || "").trim();
+function getTokenFromUrl(req: Request) {
+  const url = new URL(req.url);
+  // /api/track/<token>
+  const parts = url.pathname.split("/").filter(Boolean);
+  return parts[2] ? decodeURIComponent(parts[2]).trim() : "";
+}
+
+export async function GET(req: Request) {
+  const token = getTokenFromUrl(req);
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!url) return NextResponse.json({ error: "Missing NEXT_PUBLIC_SUPABASE_URL" }, { status: 500 });
-  if (!serviceKey) return NextResponse.json({ error: "Missing SUPABASE_SERVICE_ROLE_KEY" }, { status: 500 });
+  if (!token) {
+    return NextResponse.json({ error: "Missing token in URL" }, { status: 400 });
+  }
+  if (!url) {
+    return NextResponse.json({ error: "Missing NEXT_PUBLIC_SUPABASE_URL" }, { status: 500 });
+  }
+  if (!serviceKey) {
+    return NextResponse.json({ error: "Missing SUPABASE_SERVICE_ROLE_KEY" }, { status: 500 });
+  }
 
   const supabase = createClient(url, serviceKey, { auth: { persistSession: false } });
 
@@ -23,13 +37,7 @@ export async function GET(_req: Request, context: any) {
     .maybeSingle();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-
-  if (!data) {
-    return NextResponse.json(
-      { error: "Not found", token_received: token },
-      { status: 404 }
-    );
-  }
+  if (!data) return NextResponse.json({ error: "Not found", token_received: token }, { status: 404 });
 
   return NextResponse.json({ project: data });
 }
