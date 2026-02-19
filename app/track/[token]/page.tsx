@@ -29,10 +29,23 @@ export default function ClientTrackPage({ params }: { params: { token: string } 
       setLoading(true);
       setNotFound(false);
 
+      // ✅ DEBUG LOGS
+      console.log("TRACK TOKEN PARAM:", params.token);
+
+      const apiUrl = `/api/track/${encodeURIComponent(params.token)}`;
+      console.log("FETCHING:", apiUrl);
+
       try {
-        const res = await fetch(`/api/track/${params.token}`, {
-          cache: "no-store",
-        });
+        const res = await fetch(apiUrl, { cache: "no-store" });
+
+        let json: any = {};
+        try {
+          json = await res.json();
+        } catch {
+          json = { error: "Invalid JSON response" };
+        }
+
+        console.log("API STATUS:", res.status, "API JSON:", json);
 
         if (res.status === 404) {
           setNotFound(true);
@@ -40,18 +53,15 @@ export default function ClientTrackPage({ params }: { params: { token: string } 
           return;
         }
 
-        const json = await res.json();
-
         if (!res.ok) {
-          console.error("Track API error:", json);
           setNotFound(true);
           setProject(null);
           return;
         }
 
-        setProject(json.project);
+        setProject(json.project as Project);
       } catch (err) {
-        console.error(err);
+        console.error("FETCH ERROR:", err);
         setNotFound(true);
         setProject(null);
       } finally {
@@ -71,7 +81,7 @@ export default function ClientTrackPage({ params }: { params: { token: string } 
 
     const fileExt = file.name.split(".").pop() || "bin";
 
-    const safeClientName = project.client_name
+    const safeClientName = String(project.client_name || "client")
       .trim()
       .replace(/[\/\\?#%*:|"<>]/g, "-");
 
@@ -89,23 +99,28 @@ export default function ClientTrackPage({ params }: { params: { token: string } 
     }
 
     setUploadSuccess(true);
-    setTimeout(() => setUploadSuccess(false), 4000);
+    setTimeout(() => setUploadSuccess(false), 5000);
   };
 
+  // Loading screen
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#F5F5F7]">
+      <div className="flex h-screen flex-col items-center justify-center bg-[#F5F5F7]">
         <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+        <p className="mt-4 text-sm font-medium text-gray-500">
+          Récupération de votre dossier...
+        </p>
       </div>
     );
   }
 
+  // Not found / invalid link screen
   if (notFound || !project) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#F5F5F7]">
-        <div className="rounded-3xl bg-white p-10 text-center shadow-xl">
-          <h1 className="text-2xl font-bold">Lien invalide</h1>
-          <p className="mt-2 text-gray-500">
+      <div className="flex h-screen flex-col items-center justify-center bg-[#F5F5F7] px-6">
+        <div className="mx-auto w-full max-w-md overflow-hidden rounded-[2.5rem] border border-white/40 bg-white/80 p-8 text-center shadow-2xl shadow-gray-200/50 backdrop-blur-2xl">
+          <h1 className="text-2xl font-bold tracking-tight text-black">Lien invalide</h1>
+          <p className="mt-3 text-sm font-medium text-gray-500">
             Ce dossier n’existe pas ou n’est plus accessible.
           </p>
         </div>
@@ -113,60 +128,82 @@ export default function ClientTrackPage({ params }: { params: { token: string } 
     );
   }
 
+  // Normal screen
   return (
-    <div className="min-h-screen bg-[#F5F5F7] px-6 pt-16">
+    <div className="min-h-screen bg-[#F5F5F7] px-6 pb-12 pt-16 font-sans text-gray-900">
       <div className="mx-auto max-w-md">
-        <h1 className="text-center text-3xl font-bold">ProgressivePrêt</h1>
-        <p className="mt-2 text-center text-gray-500">
-          Suivi de dossier • {project.client_name}
-        </p>
+        {/* Header style Apple */}
+        <header className="mb-12 text-center">
+          <h1 className="text-3xl font-bold tracking-tight text-black">ProgressivePrêt</h1>
+          <p className="mt-2 font-medium text-gray-500">
+            Suivi de dossier • {project.client_name}
+          </p>
+        </header>
 
-        <div className="mt-10 rounded-3xl bg-white p-8 shadow-xl">
-          <h2 className="text-xl font-semibold">{project.status_text}</h2>
+        {/* Carte principale */}
+        <main className="relative overflow-hidden rounded-[2.5rem] border border-white/40 bg-white/80 p-8 shadow-2xl shadow-gray-200/50 backdrop-blur-2xl">
+          <div className="mb-8">
+            <h2 className="text-2xl font-semibold leading-tight tracking-tight text-gray-800">
+              {project.status_text}
+            </h2>
+            <p className="mt-2 text-sm font-medium text-gray-400">
+              Dernière actualisation :{" "}
+              {project.created_at ? new Date(project.created_at).toLocaleDateString("fr-FR") : "-"}
+            </p>
+          </div>
 
-          <div className="mt-6 h-4 w-full rounded-full bg-gray-200">
+          {/* Barre de progression Apple Style */}
+          <div className="relative mb-4 h-5 w-full overflow-hidden rounded-full bg-gray-100 shadow-inner">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-blue-600 to-green-400 transition-all"
+              className="h-full rounded-full bg-gradient-to-r from-blue-600 via-emerald-400 to-green-400 transition-all duration-1000 ease-out"
               style={{ width: `${project.progress_percent}%` }}
             />
           </div>
 
-          <div className="mt-2 text-sm text-blue-600">
-            {project.progress_percent}%
+          <div className="flex justify-between px-1 text-[10px] font-black uppercase tracking-widest text-gray-400">
+            <span>Signature</span>
+            <span className="text-blue-500">{project.progress_percent}%</span>
+            <span>Remise des clés</span>
           </div>
 
-          <div className="mt-8 space-y-4">
-            <label className="flex cursor-pointer items-center justify-center gap-3 rounded-2xl bg-black p-4 text-white">
+          {/* Actions */}
+          <div className="mt-12 space-y-4">
+            <label
+              className={`flex w-full cursor-pointer items-center justify-center gap-3 rounded-2xl p-4 font-bold transition-all active:scale-95 shadow-lg ${
+                uploadSuccess ? "bg-green-500 text-white" : "bg-black text-white hover:bg-gray-800"
+              }`}
+            >
               {uploading ? (
-                <Loader2 className="animate-spin" />
+                <Loader2 className="h-5 w-5 animate-spin" />
               ) : uploadSuccess ? (
-                <CheckCircle2 />
+                <CheckCircle2 size={20} />
               ) : (
-                <FileUp />
+                <FileUp size={20} />
               )}
-              <span>
-                {uploading
-                  ? "Envoi..."
-                  : uploadSuccess
-                  ? "Document reçu"
-                  : "Ajouter un document"}
-              </span>
-              <input
-                type="file"
-                className="hidden"
-                onChange={handleUpload}
-              />
+
+              <span>{uploading ? "Envoi..." : uploadSuccess ? "Document reçu !" : "Ajouter un document"}</span>
+
+              <input type="file" className="hidden" onChange={handleUpload} disabled={uploading} />
             </label>
 
             <a
-              href={`mailto:${project.broker_email}`}
-              className="flex items-center justify-center gap-3 rounded-2xl border p-4"
+              href={`mailto:${project.broker_email}?subject=${encodeURIComponent(
+                `Question sur mon dossier ${project.client_name}`
+              )}`}
+              className="flex w-full items-center justify-center gap-3 rounded-2xl border border-gray-200 bg-white p-4 font-bold text-gray-700 transition-all hover:bg-gray-50 active:scale-95"
             >
-              <MessageCircle />
+              <MessageCircle size={20} />
               Contacter mon courtier
             </a>
           </div>
-        </div>
+        </main>
+
+        {/* Footer discret */}
+        <footer className="mt-16 text-center">
+          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-gray-300">
+            Propulsé par ProgressivePulse
+          </p>
+        </footer>
       </div>
     </div>
   );
