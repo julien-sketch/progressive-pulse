@@ -10,6 +10,10 @@ function env(name: string) {
   return process.env[name] || "";
 }
 
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 function escapeHtml(s: string) {
   return s
     .replaceAll("&", "&amp;")
@@ -17,6 +21,42 @@ function escapeHtml(s: string) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+async function sendWithRetry(
+  resend: Resend,
+  payload: {
+    from: string;
+    to: string;
+    subject: string;
+    html: string;
+  }
+) {
+  try {
+    await resend.emails.send(payload);
+    return { ok: true as const };
+  } catch (e: any) {
+    const status = e?.statusCode || e?.status || null;
+    const name = e?.name || "";
+    const msg = e?.message || "send failed";
+
+    // Retry 1x sur rate limit
+    if (status === 429 || name === "rate_limit_exceeded") {
+      await sleep(1200);
+      try {
+        await resend.emails.send(payload);
+        return { ok: true as const, retried: true as const };
+      } catch (e2: any) {
+        return {
+          ok: false as const,
+          error: e2?.message || "rate limit retry failed",
+          status: e2?.statusCode || e2?.status || null,
+        };
+      }
+    }
+
+    return { ok: false as const, error: msg, status };
+  }
 }
 
 export async function GET() {
@@ -43,14 +83,16 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  const results: Array<{ token: string; ok: boolean; error?: string }> = [];
+  const results: Array<{ token: string; ok: boolean; error?: string; retried?: boolean }> = [];
+
+  // 600ms => ~1.6 req/s (sous la limite 2 req/s)
+  const THROTTLE_MS = 600;
 
   for (const p of projects ?? []) {
     const token = String(p.access_token || "").trim();
     const brokerEmail = String(p.broker_email || "").trim();
     if (!token || !brokerEmail) continue;
 
-    // Récupérer steps du projet
     const { data: steps, error: stepsError } = await supabase
       .from("project_steps")
       .select("order_index, label")
@@ -64,9 +106,7 @@ export async function GET() {
 
     const buttons = steps
       .map((s) => {
-        const href = `${BASE_URL}/api/immo/update-step?token=${encodeURIComponent(
-          token
-        )}&step=${s.order_index}`;
+        const href = `${BASE_URL}/api/immo/update-step?token=${encodeURIComponent(token)}&step=${s.order_index}`;
         return `
           <a href="${href}" style="display:block;text-decoration:none;padding:12px 14px;border-radius:14px;border:1px solid #e5e7eb;margin:8px 0;font-weight:700;color:#111;background:#fff">
             ${s.order_index}. ${escapeHtml(String(s.label))}
@@ -76,10 +116,7 @@ export async function GET() {
       .join("");
 
     const trackLink = `${BASE_URL}/track/${encodeURIComponent(token)}`;
-
-    const typeLabel =
-      p.project_type === "of" ? "Organisme de formation" : "Immobilier";
-
+    const typeLabel = p.project_type === "of" ? "Organisme de formation" : "Immobilier";
     const subjectName = String(p.client_name || "").trim() || "Client";
 
     const html = `
@@ -104,18 +141,31 @@ export async function GET() {
       </div>
     `;
 
-    try {
-      await resend.emails.send({
-        from: EMAIL_FROM,
-        to: brokerEmail,
-        subject: `Où en est le dossier – ${subjectName}`,
-        html,
-      });
-      results.push({ token, ok: true });
-    } catch (e: any) {
-      results.push({ token, ok: false, error: e?.message || "send failed" });
+    const sendResult = await sendWithRetry(resend, {
+      from: EMAIL_FROM,
+      to: brokerEmail,
+      subject: `Où en est le dossier – ${subjectName}`,
+      html,
+    });
+
+    if (sendResult.ok) {
+      results.push({ token, ok: true, retried: (sendResult as any).retried });
+    } else {
+      results.push({ token, ok: false, error: (sendResult as any).error || "send failed" });
     }
+
+    // Throttle pour éviter 429
+    await sleep(THROTTLE_MS);
   }
 
-  return NextResponse.json({ ok: true, sent: results.length, results });
+  const sentOk = results.filter((r) => r.ok).length;
+  const sentFail = results.filter((r) => !r.ok).length;
+
+  return NextResponse.json({
+    ok: true,
+    total: results.length,
+    sent_ok: sentOk,
+    sent_fail: sentFail,
+    results,
+  });
 }
