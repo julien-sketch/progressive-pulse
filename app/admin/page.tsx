@@ -3,10 +3,14 @@
 import { useState } from "react";
 import { Link as LinkIcon, CheckCircle2, Loader2, PlusCircle } from "lucide-react";
 
+type ProjectType = "immo" | "of";
+
 export default function AdminPage() {
   const [clientName, setClientName] = useState("");
   const [propertyName, setPropertyName] = useState("");
   const [brokerEmail, setBrokerEmail] = useState("");
+  const [projectType, setProjectType] = useState<ProjectType>("immo");
+
   const [token, setToken] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -26,6 +30,7 @@ export default function AdminPage() {
           client_name: clientName,
           broker_email: brokerEmail,
           property_name: propertyName,
+          project_type: projectType,
         }),
       });
 
@@ -44,7 +49,9 @@ export default function AdminPage() {
   };
 
   const origin =
-    typeof window !== "undefined" ? window.location.origin : "https://progressive-pulse-snowy.vercel.app";
+    typeof window !== "undefined"
+      ? window.location.origin
+      : "https://progressive-pulse-snowy.vercel.app";
 
   return (
     <div className="min-h-screen bg-zinc-50 p-6 font-sans text-zinc-900">
@@ -62,39 +69,57 @@ export default function AdminPage() {
         >
           <div>
             <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-zinc-400">
+              Type de projet
+            </label>
+            <select
+              className="w-full rounded-2xl border border-zinc-100 bg-zinc-50 p-4 outline-none focus:border-zinc-300 transition-all"
+              value={projectType}
+              onChange={(e) => setProjectType(e.target.value as ProjectType)}
+            >
+              <option value="immo">Immobilier</option>
+              <option value="of">Organisme de formation</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-zinc-400">
               Nom du client
             </label>
             <input
               required
               value={clientName}
               className="w-full rounded-2xl border border-zinc-100 bg-zinc-50 p-4 outline-none focus:border-zinc-300 transition-all"
-              placeholder="ex: M. Bernard"
+              placeholder="ex: Julien VRC / Stagiaire / Entreprise"
               onChange={(e) => setClientName(e.target.value)}
             />
           </div>
 
           <div>
             <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-zinc-400">
-              Nom du bien (optionnel)
+              Nom du dossier (optionnel)
             </label>
             <input
               value={propertyName}
               className="w-full rounded-2xl border border-zinc-100 bg-zinc-50 p-4 outline-none focus:border-zinc-300 transition-all"
-              placeholder="ex: Appart Rue Victor Hugo"
+              placeholder={
+                projectType === "immo"
+                  ? "ex: Appart Rue Victor Hugo"
+                  : "ex: Formation Excel - Mars 2026"
+              }
               onChange={(e) => setPropertyName(e.target.value)}
             />
           </div>
 
           <div>
             <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-zinc-400">
-              Email de l’agent
+              Email du pro (agent / OF)
             </label>
             <input
               required
               type="email"
               value={brokerEmail}
               className="w-full rounded-2xl border border-zinc-100 bg-zinc-50 p-4 outline-none focus:border-zinc-300 transition-all"
-              placeholder="ex: contact@agentimmo.fr"
+              placeholder="ex: contact@pro.fr"
               onChange={(e) => setBrokerEmail(e.target.value)}
             />
           </div>
@@ -108,9 +133,7 @@ export default function AdminPage() {
           </button>
         </form>
 
-        {message && (
-          <div className="mt-6 text-sm font-bold text-zinc-700">{message}</div>
-        )}
+        {message && <div className="mt-6 text-sm font-bold text-zinc-700">{message}</div>}
 
         {token && (
           <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -120,7 +143,10 @@ export default function AdminPage() {
                 <span className="font-bold text-sm">Lien prêt</span>
               </div>
 
-              <p className="text-xs font-bold uppercase tracking-widest text-emerald-600/50 mb-2">Lien pour le client</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-emerald-600/50 mb-2">
+                Lien pour le client
+              </p>
+
               <div className="flex items-center gap-2 rounded-xl bg-white p-3 border border-emerald-200 shadow-sm">
                 <code className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-emerald-800">
                   {origin}/track/{token}

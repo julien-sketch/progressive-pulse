@@ -6,35 +6,37 @@ import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
-const IMMO_STEPS = [
-  "Mandat signé",
-  "Shooting photo réalisé",
-  "Annonce publiée",
-  "Visites en cours",
-  "Offre acceptée",
-  "Compromis signé",
-  "Délai de rétractation",
-  "Acte authentique signé",
-] as const;
+function env(name: string) {
+  return process.env[name] || "";
+}
 
-function requireEnv(name: string) {
-  const v = process.env[name];
-  if (!v) throw new Error(`Missing ${name}`);
-  return v;
+function escapeHtml(s: string) {
+  return s
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
 export async function GET() {
+  const RESEND_API_KEY = env("RESEND_API_KEY");
+  const EMAIL_FROM = env("EMAIL_FROM");
+  const BASE_URL = env("BASE_URL") || "https://progressive-pulse-snowy.vercel.app";
+
+  if (!RESEND_API_KEY) {
+    return NextResponse.json({ error: "Missing RESEND_API_KEY" }, { status: 500 });
+  }
+  if (!EMAIL_FROM) {
+    return NextResponse.json({ error: "Missing EMAIL_FROM" }, { status: 500 });
+  }
+
   const supabase = getSupabaseAdmin();
-
-  const RESEND_API_KEY = requireEnv("RESEND_API_KEY");
-  const EMAIL_FROM = requireEnv("EMAIL_FROM");
-  const BASE_URL = process.env.BASE_URL || "https://progressive-pulse-snowy.vercel.app";
-
   const resend = new Resend(RESEND_API_KEY);
 
   const { data: projects, error } = await supabase
     .from("projects")
-    .select("id, client_name, broker_email, access_token")
+    .select("id, client_name, broker_email, access_token, project_type")
     .not("broker_email", "is", null);
 
   if (error) {
@@ -44,28 +46,48 @@ export async function GET() {
   const results: Array<{ token: string; ok: boolean; error?: string }> = [];
 
   for (const p of projects ?? []) {
-    const token = p.access_token as string;
+    const token = String(p.access_token || "").trim();
     const brokerEmail = String(p.broker_email || "").trim();
-    if (!brokerEmail) continue;
+    if (!token || !brokerEmail) continue;
 
-    // Boutons étapes -> /api/immo/update-step?token=...&step=...
-    const buttons = IMMO_STEPS.map((label, idx) => {
-      const step = idx + 1;
-      const href = `${BASE_URL}/api/immo/update-step?token=${encodeURIComponent(token)}&step=${step}`;
-      return `
-        <a href="${href}" style="display:block;text-decoration:none;padding:12px 14px;border-radius:14px;border:1px solid #e5e7eb;margin:8px 0;font-weight:700;color:#111;background:#fff">
-          ${step}. ${label}
-        </a>
-      `;
-    }).join("");
+    // Récupérer steps du projet
+    const { data: steps, error: stepsError } = await supabase
+      .from("project_steps")
+      .select("order_index, label")
+      .eq("project_id", p.id)
+      .order("order_index", { ascending: true });
+
+    if (stepsError || !steps?.length) {
+      results.push({ token, ok: false, error: stepsError?.message || "No steps" });
+      continue;
+    }
+
+    const buttons = steps
+      .map((s) => {
+        const href = `${BASE_URL}/api/immo/update-step?token=${encodeURIComponent(
+          token
+        )}&step=${s.order_index}`;
+        return `
+          <a href="${href}" style="display:block;text-decoration:none;padding:12px 14px;border-radius:14px;border:1px solid #e5e7eb;margin:8px 0;font-weight:700;color:#111;background:#fff">
+            ${s.order_index}. ${escapeHtml(String(s.label))}
+          </a>
+        `;
+      })
+      .join("");
 
     const trackLink = `${BASE_URL}/track/${encodeURIComponent(token)}`;
+
+    const typeLabel =
+      p.project_type === "of" ? "Organisme de formation" : "Immobilier";
+
+    const subjectName = String(p.client_name || "").trim() || "Client";
 
     const html = `
       <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f5f5f7;padding:24px">
         <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:24px;padding:20px;border:1px solid #eef2f7">
           <h2 style="margin:0 0 6px;font-size:18px;color:#111">Mise à jour du dossier</h2>
-          <p style="margin:0 0 14px;color:#555;font-weight:600">Client : ${escapeHtml(String(p.client_name || "Client"))}</p>
+          <p style="margin:0 0 10px;color:#6b7280;font-weight:700">${escapeHtml(typeLabel)}</p>
+          <p style="margin:0 0 14px;color:#555;font-weight:600">Client : ${escapeHtml(subjectName)}</p>
 
           <p style="margin:0 0 10px;color:#111;font-weight:800">Clique sur l’étape actuelle :</p>
           ${buttons}
@@ -76,7 +98,7 @@ export async function GET() {
           </p>
 
           <p style="margin:18px 0 0;color:#9ca3af;font-weight:800;font-size:10px;letter-spacing:.25em;text-transform:uppercase">
-            Pro-Pulse Immobilier
+            Pro-Pulse
           </p>
         </div>
       </div>
@@ -86,7 +108,7 @@ export async function GET() {
       await resend.emails.send({
         from: EMAIL_FROM,
         to: brokerEmail,
-        subject: `Où en est le dossier – ${String(p.client_name || "").trim() || "Client"}`,
+        subject: `Où en est le dossier – ${subjectName}`,
         html,
       });
       results.push({ token, ok: true });
@@ -96,13 +118,4 @@ export async function GET() {
   }
 
   return NextResponse.json({ ok: true, sent: results.length, results });
-}
-
-function escapeHtml(s: string) {
-  return s
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
 }
