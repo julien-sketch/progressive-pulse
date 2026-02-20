@@ -9,15 +9,23 @@ type Project = {
   progress_percent: number;
   status_text: string;
   created_at: string | null;
+  updated_at: string | null;
   broker_email: string;
   drive_folder_url: string | null;
   access_token: string;
+};
+
+type Step = {
+  order_index: number;
+  label: string;
+  is_completed: boolean;
 };
 
 export default function ClientTrack({ token }: { token: string }) {
   const supabase = useMemo(() => getSupabaseBrowser(), []);
 
   const [project, setProject] = useState<Project | null>(null);
+  const [steps, setSteps] = useState<Step[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -35,6 +43,7 @@ export default function ClientTrack({ token }: { token: string }) {
       if (!cleanToken) {
         setNotFound(true);
         setProject(null);
+        setSteps([]);
         setLoading(false);
         return;
       }
@@ -45,6 +54,7 @@ export default function ClientTrack({ token }: { token: string }) {
         if (res.status === 404) {
           setNotFound(true);
           setProject(null);
+          setSteps([]);
           return;
         }
 
@@ -54,14 +64,17 @@ export default function ClientTrack({ token }: { token: string }) {
           console.error("Track API error:", json);
           setNotFound(true);
           setProject(null);
+          setSteps([]);
           return;
         }
 
         setProject(json.project as Project);
+        setSteps((json.steps as Step[]) ?? []);
       } catch (err) {
         console.error(err);
         setNotFound(true);
         setProject(null);
+        setSteps([]);
       } finally {
         setLoading(false);
       }
@@ -78,10 +91,11 @@ export default function ClientTrack({ token }: { token: string }) {
     setUploadSuccess(false);
 
     const fileExt = file.name.split(".").pop() || "bin";
-    const safeClientName = String(project.client_name || "client")
+    const safeToken = String(project.access_token || "dossier")
       .trim()
       .replace(/[\/\\?#%*:|"<>]/g, "-");
-    const fileName = `${safeClientName}/${Date.now()}.${fileExt}`;
+
+    const fileName = `${safeToken}/${Date.now()}.${fileExt}`;
 
     const { error } = await supabase.storage
       .from("client-documents")
@@ -97,6 +111,12 @@ export default function ClientTrack({ token }: { token: string }) {
     setUploadSuccess(true);
     setTimeout(() => setUploadSuccess(false), 5000);
   };
+
+  const lastUpdate =
+    project?.updated_at || project?.created_at || null;
+
+  const completedCount = steps.filter((s) => s.is_completed).length;
+  const totalCount = steps.length || 8;
 
   if (loading) {
     return (
@@ -126,7 +146,7 @@ export default function ClientTrack({ token }: { token: string }) {
     <div className="min-h-screen bg-[#F5F5F7] px-6 pb-12 pt-16 font-sans text-gray-900">
       <div className="mx-auto max-w-md">
         <header className="mb-12 text-center">
-          <h1 className="text-3xl font-bold tracking-tight text-black">ProgressivePrêt</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-black">Pro-Pulse</h1>
           <p className="mt-2 font-medium text-gray-500">
             Suivi de dossier • {project.client_name}
           </p>
@@ -138,23 +158,52 @@ export default function ClientTrack({ token }: { token: string }) {
               {project.status_text}
             </h2>
             <p className="mt-2 text-sm font-medium text-gray-400">
-              Dernière actualisation :{" "}
-              {project.created_at ? new Date(project.created_at).toLocaleDateString("fr-FR") : "-"}
+              Dernière mise à jour :{" "}
+              {lastUpdate ? new Date(lastUpdate).toLocaleDateString("fr-FR") : "-"}
             </p>
           </div>
 
           <div className="relative mb-4 h-5 w-full overflow-hidden rounded-full bg-gray-100 shadow-inner">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-blue-600 via-emerald-400 to-green-400 transition-all duration-1000 ease-out"
+              className="h-full rounded-full bg-gradient-to-r from-blue-600 via-emerald-400 to-green-400 transition-all duration-700 ease-out"
               style={{ width: `${project.progress_percent}%` }}
             />
           </div>
 
           <div className="flex justify-between px-1 text-[10px] font-black uppercase tracking-widest text-gray-400">
-            <span>Signature</span>
-            <span className="text-blue-500">{project.progress_percent}%</span>
-            <span>Remise des clés</span>
+            <span>Début</span>
+            <span className="text-blue-500">
+              {project.progress_percent}% ({completedCount}/{totalCount})
+            </span>
+            <span>Fin</span>
           </div>
+
+          {!!steps.length && (
+            <div className="mt-10">
+              <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.25em] text-gray-400">
+                Étapes
+              </p>
+              <div className="space-y-2">
+                {steps.map((s) => (
+                  <div
+                    key={s.order_index}
+                    className={`flex items-center justify-between rounded-2xl border p-4 text-sm font-semibold ${
+                      s.is_completed
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                        : "border-gray-200 bg-white text-gray-800"
+                    }`}
+                  >
+                    <span>
+                      {s.order_index}. {s.label}
+                    </span>
+                    <span className="text-xs font-black uppercase tracking-widest">
+                      {s.is_completed ? "OK" : "—"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="mt-12 space-y-4">
             <label
@@ -182,14 +231,14 @@ export default function ClientTrack({ token }: { token: string }) {
               className="flex w-full items-center justify-center gap-3 rounded-2xl border border-gray-200 bg-white p-4 font-bold text-gray-700 transition-all hover:bg-gray-50 active:scale-95"
             >
               <MessageCircle size={20} />
-              Contacter mon courtier
+              Contacter mon agent
             </a>
           </div>
         </main>
 
         <footer className="mt-16 text-center">
           <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-gray-300">
-            Propulsé par ProgressivePulse
+            Propulsé par Pro-Pulse
           </p>
         </footer>
       </div>

@@ -1,0 +1,5 @@
+{
+  "crons": [
+    { "path": "/api/immo/send-weekly-emails", "schedule": "0 8 * * 1" }
+  ]
+}
