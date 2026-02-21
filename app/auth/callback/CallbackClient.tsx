@@ -12,23 +12,35 @@ export default function CallbackClient() {
 
   useEffect(() => {
     const run = async () => {
-      const code = sp.get("code");
-
-      // Selon le flow, tu peux avoir ?code=... ou des paramètres d’erreur
+      // erreurs éventuelles
       const errorDesc = sp.get("error_description") || sp.get("error");
       if (errorDesc) {
         setMsg("Erreur : " + errorDesc);
         return;
       }
 
-      if (!code) {
-        setMsg("Code manquant dans l’URL.");
+      // ✅ PKCE: code dans l'URL
+      const code = sp.get("code");
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) {
+          setMsg("Erreur : " + error.message);
+          return;
+        }
+        router.replace("/pro");
         return;
       }
 
-      const { error } = await supabase.auth.exchangeCodeForSession(code);
+      // ✅ Fallback: au cas où Supabase utilise encore le hash (#access_token=...)
+      const { error } = await supabase.auth.getSessionFromUrl({ storeSession: true });
       if (error) {
-        setMsg("Erreur : " + error.message);
+        setMsg("Lien invalide ou expiré. Reconnecte-toi.");
+        return;
+      }
+
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) {
+        setMsg("Session introuvable. Reconnecte-toi.");
         return;
       }
 
