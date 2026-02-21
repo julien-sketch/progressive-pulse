@@ -15,15 +15,18 @@ export default function LoginPage() {
 
     const origin = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
 
-await supabase.auth.signInWithOtp({
-  email,
-  options: { emailRedirectTo: `${origin}/auth/callback` },
-});
+    const { error: signInError } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: `${origin}/auth/callback`,
+      },
+    });
 
-    if (error) {
-      setErr(error.message);
+    if (signInError) {
+      setErr(signInError.message);
       return;
     }
+
     setSent(true);
   };
 
@@ -50,14 +53,17 @@ await supabase.auth.signInWithOtp({
             />
           </div>
 
-          <button className="w-full rounded-2xl bg-black p-4 font-black text-white hover:bg-zinc-800 transition">
+          <button
+            type="submit"
+            className="w-full rounded-2xl bg-black p-4 font-black text-white hover:bg-zinc-800 transition"
+          >
             Envoyer le lien
           </button>
         </form>
 
         {sent && (
           <div className="mt-6 rounded-2xl bg-emerald-50 border border-emerald-100 p-4 text-emerald-800 font-bold">
-            Lien envoyé. Vérifiez votre boîte mail (et spam).
+            Lien envoyé. Vérifiez votre boîte mail (et le spam).
           </div>
         )}
 
