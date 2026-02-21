@@ -7,7 +7,6 @@ export function getSupabaseBrowser() {
 
   return createClient(url, key, {
     auth: {
-      // ✅ force les magic links à utiliser ?code=...
       flowType: "pkce",
       persistSession: true,
       autoRefreshToken: true,

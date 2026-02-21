@@ -4,6 +4,17 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 
+function parseHashParams(hash: string) {
+  const h = hash.startsWith("#") ? hash.slice(1) : hash;
+  const params = new URLSearchParams(h);
+  return {
+    access_token: params.get("access_token"),
+    refresh_token: params.get("refresh_token"),
+    error: params.get("error"),
+    error_description: params.get("error_description"),
+  };
+}
+
 export default function CallbackClient() {
   const supabase = useMemo(() => getSupabaseBrowser(), []);
   const router = useRouter();
@@ -12,14 +23,14 @@ export default function CallbackClient() {
 
   useEffect(() => {
     const run = async () => {
-      // erreurs éventuelles
-      const errorDesc = sp.get("error_description") || sp.get("error");
-      if (errorDesc) {
-        setMsg("Erreur : " + errorDesc);
+      // erreurs en query
+      const qErr = sp.get("error") || sp.get("error_description");
+      if (qErr) {
+        setMsg("Erreur : " + qErr);
         return;
       }
 
-      // ✅ PKCE: code dans l'URL
+      // ✅ PKCE : /auth/callback?code=...
       const code = sp.get("code");
       if (code) {
         const { error } = await supabase.auth.exchangeCodeForSession(code);
@@ -31,20 +42,32 @@ export default function CallbackClient() {
         return;
       }
 
-      // ✅ Fallback: au cas où Supabase utilise encore le hash (#access_token=...)
-      const { error } = await supabase.auth.getSessionFromUrl({ storeSession: true });
-      if (error) {
-        setMsg("Lien invalide ou expiré. Reconnecte-toi.");
+      // ✅ Fallback implicit : /auth/callback#access_token=...&refresh_token=...
+      const { access_token, refresh_token, error, error_description } = parseHashParams(
+        typeof window !== "undefined" ? window.location.hash : ""
+      );
+
+      if (error || error_description) {
+        setMsg("Erreur : " + (error_description || error));
         return;
       }
 
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) {
-        setMsg("Session introuvable. Reconnecte-toi.");
+      if (access_token && refresh_token) {
+        const { error: setErr } = await supabase.auth.setSession({
+          access_token,
+          refresh_token,
+        });
+
+        if (setErr) {
+          setMsg("Lien invalide ou expiré. Reconnecte-toi.");
+          return;
+        }
+
+        router.replace("/pro");
         return;
       }
 
-      router.replace("/pro");
+      setMsg("Lien invalide ou incomplet. Reconnecte-toi.");
     };
 
     run();
