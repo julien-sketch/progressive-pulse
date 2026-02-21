@@ -13,13 +13,15 @@ export default function LoginPage() {
     e.preventDefault();
     setErr(null);
 
-    const origin = window.location.origin;
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: `${origin}/auth/callback`,
-      },
-    });
+    const origin =
+  process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
+
+const { error } = await supabase.auth.signInWithOtp({
+  email,
+  options: {
+    emailRedirectTo: `${origin}/auth/callback`,
+  },
+});
 
     if (error) {
       setErr(error.message);
