@@ -7,10 +7,12 @@ export function getSupabaseBrowser() {
 
   return createClient(url, key, {
     auth: {
-      flowType: "pkce",
+      // ✅ implicit: pas de code_verifier requis
+      flowType: "implicit",
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
+      storageKey: "propulse-auth", // évite conflits si tu as d’autres apps supabase
     },
   });
 }
