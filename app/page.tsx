@@ -2,16 +2,16 @@ import Image from "next/image";
 import { CheckCircle2, ArrowRight, ShieldCheck, Clock, Star } from "lucide-react";
 
 export default function Home() {
-  // REMPLACE PAR TON LIEN REEL GENERÉ SUR STRIPE
-  const STRIPE_LINK = "https://buy.stripe.com/eVq8wQ3kJ7vWc2x58veIw00";
+  // ✅ On envoie vers /pro (si pas connecté => /login)
+  const CTA_LINK = "/pro";
 
   return (
     <div className="min-h-screen bg-zinc-50 font-sans text-zinc-950 selection:bg-blue-100">
       {/* Navigation Minimaliste */}
       <nav className="flex items-center justify-between px-8 py-6 max-w-7xl mx-auto">
         <span className="text-xl font-bold tracking-tighter italic">ProgressivePrêt</span>
-        <a 
-          href={STRIPE_LINK}
+        <a
+          href={CTA_LINK}
           className="text-sm font-semibold bg-zinc-900 text-white px-5 py-2.5 rounded-full hover:bg-zinc-800 transition-all"
         >
           Démarrer maintenant
@@ -33,14 +33,18 @@ export default function Home() {
             Offrez à vos emprunteurs une interface de suivi premium et collectez vos documents 2x plus vite. Libérez vos week-ends.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <a 
-              href={STRIPE_LINK}
+            <a
+              href={CTA_LINK}
               className="flex h-14 w-full sm:w-auto items-center justify-center gap-3 rounded-2xl bg-zinc-950 px-8 text-white transition-all hover:scale-[1.02] active:scale-[0.98] shadow-xl shadow-zinc-200"
             >
               Commander mon Pack 10 Dossiers
               <ArrowRight size={18} />
             </a>
           </div>
+
+          <p className="mt-4 text-xs font-semibold text-zinc-500">
+            Étape 1 : connexion • Étape 2 : achat • Étape 3 : création de dossiers
+          </p>
         </section>
 
         {/* Features Grid */}
@@ -82,7 +86,7 @@ export default function Home() {
             </div>
             <h2 className="text-2xl font-bold mb-2">Pack Lancement 🚀</h2>
             <p className="text-zinc-400 mb-8 text-sm">Offre limitée aux 5 premiers partenaires</p>
-            
+
             <div className="flex items-baseline gap-1 mb-8">
               <span className="text-5xl font-black">390€</span>
               <span className="text-zinc-400">/ 10 dossiers</span>
@@ -94,7 +98,7 @@ export default function Home() {
                 "Mises à jour illimitées",
                 "Stockage de documents sécurisé",
                 "Support prioritaire WhatsApp",
-                "Zéro abonnement mensuel"
+                "Zéro abonnement mensuel",
               ].map((item) => (
                 <li key={item} className="flex items-center gap-3 text-sm text-zinc-300">
                   <CheckCircle2 size={16} className="text-blue-400" />
@@ -103,12 +107,16 @@ export default function Home() {
               ))}
             </ul>
 
-            <a 
-              href={STRIPE_LINK}
+            <a
+              href={CTA_LINK}
               className="block w-full bg-white text-zinc-950 text-center py-4 rounded-2xl font-bold hover:bg-zinc-100 transition-colors shadow-lg"
             >
               Réserver mes crédits
             </a>
+
+            <p className="mt-4 text-xs font-semibold text-zinc-400">
+              Vous serez redirigé vers votre espace pour finaliser l’achat.
+            </p>
           </div>
         </section>
       </main>
