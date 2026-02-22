@@ -5,46 +5,74 @@ import { getSupabaseBrowser } from "@/lib/supabase-browser";
 
 type Project = {
   id: string;
+  created_at: string | null;
   client_name: string;
-  status_text: string | null;
   progress_percent: number | null;
+  status_text: string | null;
   access_token: string;
-  project_type: string | null;
-  created_at?: string | null;
+  broker_email: string | null;
+  drive_folder_url: string | null;
+  updated_at: string | null;
+  project_type: string | null; // "immo" | "of"
+  owner_user_id: string | null;
 };
 
-type StepRow = {
-  id: string;
-  project_id: string;
-  order_index: number | null;
-  is_completed: boolean | null;
-  label?: string | null;
-  name?: string | null;
-  title?: string | null;
-};
-
-type Step = {
-  id: string;
-  project_id: string;
-  order_index: number;
+type StatusDef = {
   label: string;
-  is_completed: boolean;
+  percent: number;
 };
 
-const DEFAULT_STEPS: Array<{ label: string }> = [
-  { label: "Pièce d’identité" },
-  { label: "Justificatif de domicile" },
-  { label: "Situation professionnelle" },
-  { label: "Revenus" },
-  { label: "Relevés bancaires" },
-  { label: "Charges & crédits" },
-  { label: "Épargne & apport" },
-  { label: "Documents spécifiques" },
-];
+const STATUS_BY_TYPE: Record<string, StatusDef[]> = {
+  immo: [
+    { label: "Mandat non confirmé", percent: 0 },
+    { label: "Mandat signé", percent: 10 },
+    { label: "Documents reçus", percent: 25 },
+    { label: "Dossier complet", percent: 35 },
+    { label: "Visites en cours", percent: 50 },
+    { label: "Offre acceptée", percent: 70 },
+    { label: "Compromis signé", percent: 80 },
+    { label: "Délai de rétractation", percent: 88 },
+    { label: "Acte signé", percent: 100 },
+  ],
+  of: [
+    { label: "Documents reçus", percent: 0 },
+    { label: "Dossier complet", percent: 25 },
+    { label: "Dépôt effectué auprès du fonds de formation", percent: 38 },
+    { label: "En attente de validation", percent: 50 },
+    { label: "Validé", percent: 80 },
+    { label: "Financement reçu", percent: 100 },
+  ],
+  other: [
+    { label: "Documents reçus", percent: 0 },
+    { label: "Dossier complet", percent: 50 },
+    { label: "Terminé", percent: 100 },
+  ],
+};
 
-function pct(n: number | null | undefined) {
-  const v = typeof n === "number" ? n : 0;
-  return Math.max(0, Math.min(100, Math.round(v)));
+function clampPct(n: number) {
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
+
+function normalizeType(t: string | null | undefined) {
+  const v = (t ?? "").toLowerCase().trim();
+  if (v === "immobilier") return "immo";
+  if (v === "formation") return "of";
+  if (v === "immo" || v === "of") return v;
+  return "other";
+}
+
+function makeAccessToken(clientName: string) {
+  // token simple et stable : slug + random 3 chiffres
+  const slug = clientName
+    .toLowerCase()
+    .trim()
+    .replace(/['"]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 30);
+
+  const rnd = Math.floor(100 + Math.random() * 900); // 100-999
+  return `${slug || "client"}-${rnd}`;
 }
 
 export default function ProPage() {
@@ -55,20 +83,18 @@ export default function ProPage() {
   const [userEmail, setUserEmail] = useState<string>("");
 
   const [credits, setCredits] = useState<number>(0);
-
   const [projects, setProjects] = useState<Project[]>([]);
-  const [stepsMap, setStepsMap] = useState<Record<string, Step[]>>({});
 
-  // create dossier
-  const [type, setType] = useState<string>("Immobilier");
+  // create
+  const [typeUi, setTypeUi] = useState<string>("Immobilier");
   const [clientName, setClientName] = useState<string>("");
-  const [dossierName, setDossierName] = useState<string>("");
   const [creating, setCreating] = useState(false);
 
-  // steps editing / updating
-  const [togglingStepId, setTogglingStepId] = useState<string | null>(null);
-  const [editingStepId, setEditingStepId] = useState<string | null>(null);
-  const [editingValue, setEditingValue] = useState<string>("");
+  const [updatingProjectId, setUpdatingProjectId] = useState<string | null>(null);
+
+  const stripeCheckoutUrl = `https://buy.stripe.com/eVq8wQ3kJ7vWc2x58veIw00?prefilled_email=${encodeURIComponent(
+    userEmail || ""
+  )}`;
 
   const loadAll = async () => {
     setLoading(true);
@@ -78,7 +104,7 @@ export default function ProPage() {
       error: userErr,
     } = await supabase.auth.getUser();
 
-    if (userErr) console.error("auth.getUser error:", userErr);
+    if (userErr) console.error("auth.getUser:", userErr);
 
     if (!user) {
       window.location.href = "/login";
@@ -91,7 +117,7 @@ export default function ProPage() {
     setUserId(uid);
     setUserEmail(email);
 
-    // 1) CREDITS depuis credit_wallets
+    // credits
     const { data: walletRow, error: walletErr } = await supabase
       .from("credit_wallets")
       .select("credits")
@@ -99,74 +125,29 @@ export default function ProPage() {
       .maybeSingle();
 
     if (walletErr) {
-      console.error("Erreur credit_wallets:", walletErr);
+      console.error("credit_wallets:", walletErr);
       setCredits(0);
     } else {
       setCredits(Number(walletRow?.credits ?? 0));
     }
 
-    // 2) PROJETS
+    // projects
     const { data: projectsData, error: projectsErr } = await supabase
       .from("projects")
-      .select("id, client_name, status_text, progress_percent, access_token, project_type, created_at")
+      .select(
+        "id,created_at,client_name,progress_percent,status_text,access_token,broker_email,drive_folder_url,updated_at,project_type,owner_user_id"
+      )
       .eq("broker_email", email)
       .order("created_at", { ascending: false });
 
     if (projectsErr) {
-      console.error("Erreur projects:", projectsErr);
+      console.error("projects:", projectsErr);
       setProjects([]);
-      setStepsMap({});
       setLoading(false);
       return;
     }
 
-    const list = (projectsData ?? []) as Project[];
-    setProjects(list);
-
-    // 3) ETAPES
-    if (list.length === 0) {
-      setStepsMap({});
-      setLoading(false);
-      return;
-    }
-
-    const projectIds = list.map((p) => p.id);
-
-    const { data: stepsData, error: stepsErr } = await supabase
-      .from("steps")
-      .select("id, project_id, order_index, is_completed, label, name, title")
-      .in("project_id", projectIds)
-      .order("order_index", { ascending: true });
-
-    if (stepsErr) {
-      console.error("Erreur steps:", stepsErr);
-      setStepsMap({});
-      setLoading(false);
-      return;
-    }
-
-    const map: Record<string, Step[]> = {};
-    (stepsData ?? []).forEach((s: StepRow) => {
-      const pid = s.project_id;
-      const order = typeof s.order_index === "number" ? s.order_index : 0;
-
-      const lbl =
-        (s.label ?? s.name ?? s.title ?? "").trim() ||
-        `Étape ${order}`;
-
-      const step: Step = {
-        id: s.id,
-        project_id: pid,
-        order_index: order,
-        label: lbl,
-        is_completed: !!s.is_completed,
-      };
-
-      if (!map[pid]) map[pid] = [];
-      map[pid].push(step);
-    });
-
-    setStepsMap(map);
+    setProjects((projectsData ?? []) as Project[]);
     setLoading(false);
   };
 
@@ -193,17 +174,15 @@ export default function ProPage() {
   const createDossier = async () => {
     if (creating) return;
 
-    const trimmedClient = clientName.trim();
-    if (!trimmedClient) {
+    const name = clientName.trim();
+    if (!name) {
       alert("Renseigne le nom du client.");
       return;
     }
-
-    if (!userId) {
+    if (!userId || !userEmail) {
       alert("Utilisateur non chargé.");
       return;
     }
-
     if (credits <= 0) {
       alert("Plus de crédits. Achète des dossiers.");
       return;
@@ -211,150 +190,92 @@ export default function ProPage() {
 
     setCreating(true);
 
+    const projectType = normalizeType(typeUi);
+    const defaults = STATUS_BY_TYPE[projectType] ?? STATUS_BY_TYPE.other;
+    const defaultStatus = defaults[0];
+
+    const accessToken = makeAccessToken(name);
+
+    // ✅ INSERT avec TES colonnes uniquement
     const { data: inserted, error: insErr } = await supabase
       .from("projects")
       .insert({
-        client_name: trimmedClient,
-        project_type: type,
-        dossier_name: dossierName.trim() || null,
-        status_text: "Dossier en cours",
-        progress_percent: 0,
+        client_name: name,
+        progress_percent: defaultStatus.percent,
+        status_text: defaultStatus.label,
+        access_token: accessToken,
         broker_email: userEmail,
         drive_folder_url: null,
+        project_type: projectType,
+        owner_user_id: userId,
       })
-      .select("id, client_name, status_text, progress_percent, access_token, project_type, created_at")
+      .select(
+        "id,created_at,client_name,progress_percent,status_text,access_token,broker_email,drive_folder_url,updated_at,project_type,owner_user_id"
+      )
       .single();
 
     if (insErr) {
       console.error("Erreur création projet:", insErr);
-      alert("Erreur création dossier.");
+      alert(`Erreur création dossier : ${insErr.message}`);
       setCreating(false);
       return;
     }
 
-    const newProject = inserted as Project;
-
-    // Crée les étapes par défaut
-    const stepsPayload = DEFAULT_STEPS.map((st, idx) => ({
-      project_id: newProject.id,
-      order_index: idx + 1,
-      label: st.label,
-      is_completed: false,
-    }));
-
-    const { error: stepsCreateErr } = await supabase.from("steps").insert(stepsPayload);
-    if (stepsCreateErr) {
-      console.error("Erreur insert steps:", stepsCreateErr);
-    }
-
-    // Décrément crédits
+    // décrément crédits
     const nextCredits = credits - 1;
     const { error: creditsErr } = await supabase
       .from("credit_wallets")
-      .update({
-        credits: nextCredits,
-        updated_at: new Date().toISOString(),
-      })
+      .update({ credits: nextCredits, updated_at: new Date().toISOString() })
       .eq("user_id", userId);
 
     if (creditsErr) {
-      console.error("Erreur décrément credits:", creditsErr);
+      console.error("Erreur update crédits:", creditsErr);
+      alert("Dossier créé, mais crédits non mis à jour (RLS ?).");
+      // On continue, mais tu dois corriger RLS si besoin
     }
 
     setClientName("");
-    setDossierName("");
     setCreating(false);
 
+    // refresh
     await loadAll();
   };
 
-  // ✅ Toggle étape: clic
-  const toggleStep = async (step: Step) => {
-    if (togglingStepId) return;
+  const setProjectStatus = async (project: Project, status: StatusDef) => {
+    if (updatingProjectId) return;
 
-    setTogglingStepId(step.id);
+    setUpdatingProjectId(project.id);
 
-    // Optimistic UI
-    setStepsMap((prev) => {
-      const next = { ...prev };
-      const arr = (next[step.project_id] || []).map((s) =>
-        s.id === step.id ? { ...s, is_completed: !s.is_completed } : s
-      );
-      next[step.project_id] = arr;
-      return next;
-    });
+    // optimistic UI
+    setProjects((prev) =>
+      prev.map((p) =>
+        p.id === project.id
+          ? {
+              ...p,
+              status_text: status.label,
+              progress_percent: clampPct(status.percent),
+            }
+          : p
+      )
+    );
 
     const { error } = await supabase
-      .from("steps")
-      .update({ is_completed: !step.is_completed })
-      .eq("id", step.id);
+      .from("projects")
+      .update({
+        status_text: status.label,
+        progress_percent: clampPct(status.percent),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", project.id);
 
     if (error) {
-      console.error("Erreur toggle step:", error);
-      alert("Impossible de mettre à jour l'étape. (RLS ?)");
-      // rollback = reload
-      await loadAll();
+      console.error("Erreur update status:", error);
+      alert("Impossible de mettre à jour le statut (RLS ?).");
+      await loadAll(); // rollback
     }
 
-    setTogglingStepId(null);
+    setUpdatingProjectId(null);
   };
-
-  // ✅ Init étapes si un projet n’en a pas
-  const initStepsForProject = async (projectId: string) => {
-    const payload = DEFAULT_STEPS.map((st, idx) => ({
-      project_id: projectId,
-      order_index: idx + 1,
-      label: st.label,
-      is_completed: false,
-    }));
-
-    const { error } = await supabase.from("steps").insert(payload);
-    if (error) {
-      console.error("Erreur init steps:", error);
-      alert("Impossible de créer les étapes. (RLS ?)");
-      return;
-    }
-
-    await loadAll();
-  };
-
-  // ✅ Edit label: double-clic -> input -> enter/blur save
-  const startEdit = (step: Step) => {
-    setEditingStepId(step.id);
-    setEditingValue(step.label);
-  };
-
-  const saveEdit = async (step: Step) => {
-    const newLabel = editingValue.trim();
-    setEditingStepId(null);
-
-    if (!newLabel) {
-      alert("Le nom de l'étape ne peut pas être vide.");
-      await loadAll();
-      return;
-    }
-
-    // Optimistic UI
-    setStepsMap((prev) => {
-      const next = { ...prev };
-      const arr = (next[step.project_id] || []).map((s) =>
-        s.id === step.id ? { ...s, label: newLabel } : s
-      );
-      next[step.project_id] = arr;
-      return next;
-    });
-
-    const { error } = await supabase.from("steps").update({ label: newLabel }).eq("id", step.id);
-    if (error) {
-      console.error("Erreur update label:", error);
-      alert("Impossible de renommer l'étape. (RLS ?)");
-      await loadAll();
-    }
-  };
-
-  const stripeCheckoutUrl = `https://buy.stripe.com/eVq8wQ3kJ7vWc2x58veIw00?prefilled_email=${encodeURIComponent(
-    userEmail || ""
-  )}`;
 
   if (loading) {
     return (
@@ -398,7 +319,7 @@ export default function ProPage() {
             </p>
 
             <div className="mt-6 flex items-center gap-3">
-              {/* plus petit */}
+              {/* ✅ plus petit */}
               <a
                 href={stripeCheckoutUrl}
                 target="_blank"
@@ -408,7 +329,7 @@ export default function ProPage() {
                 Acheter des dossiers
               </a>
 
-              {/* plus petit */}
+              {/* ✅ plus petit */}
               <button
                 onClick={loadAll}
                 className="inline-flex items-center justify-center rounded-2xl bg-black text-white px-4 py-2 text-sm font-bold hover:bg-zinc-800 transition"
@@ -426,13 +347,12 @@ export default function ProPage() {
               <div>
                 <div className="text-xs font-black tracking-widest text-zinc-400">TYPE</div>
                 <select
-                  value={type}
-                  onChange={(e) => setType(e.target.value)}
+                  value={typeUi}
+                  onChange={(e) => setTypeUi(e.target.value)}
                   className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 font-semibold outline-none focus:ring-2 focus:ring-black/10"
                 >
                   <option>Immobilier</option>
-                  <option>Crédit conso</option>
-                  <option>Assurance</option>
+                  <option>Formation</option>
                   <option>Autre</option>
                 </select>
               </div>
@@ -443,18 +363,6 @@ export default function ProPage() {
                   value={clientName}
                   onChange={(e) => setClientName(e.target.value)}
                   placeholder="ex: Nabil / Mme Martin"
-                  className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 font-semibold outline-none focus:ring-2 focus:ring-black/10"
-                />
-              </div>
-
-              <div>
-                <div className="text-xs font-black tracking-widest text-zinc-400">
-                  NOM DOSSIER (OPTIONNEL)
-                </div>
-                <input
-                  value={dossierName}
-                  onChange={(e) => setDossierName(e.target.value)}
-                  placeholder="ex: Appart Lyon"
                   className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 font-semibold outline-none focus:ring-2 focus:ring-black/10"
                 />
               </div>
@@ -479,8 +387,9 @@ export default function ProPage() {
 
           <div className="mt-6 space-y-6">
             {projects.map((p) => {
-              const steps = stepsMap[p.id] || [];
-              const progress = pct(p.progress_percent);
+              const t = normalizeType(p.project_type);
+              const statuses = STATUS_BY_TYPE[t] ?? STATUS_BY_TYPE.other;
+              const progress = clampPct(p.progress_percent ?? 0);
 
               return (
                 <div key={p.id} className="rounded-3xl border border-zinc-200 bg-white p-6">
@@ -489,15 +398,15 @@ export default function ProPage() {
                       <div className="flex items-center gap-2">
                         <div className="text-xl font-black">{p.client_name}</div>
                         <div className="text-xs font-black tracking-widest text-zinc-400">
-                          • {p.project_type ?? "OF"}
+                          • {t.toUpperCase()}
                         </div>
                       </div>
 
                       <div className="mt-1 text-sm font-semibold text-zinc-600">
-                        {(p.status_text ?? "Dossier en cours")} — {progress}%
+                        {(p.status_text ?? "—")} — {progress}%
                       </div>
                       <div className="mt-1 text-xs text-zinc-500">
-                        Clic = valider / invalider. Double-clic = renommer.
+                        Clique sur un bouton pour mettre à jour le dossier.
                       </div>
                     </div>
 
@@ -520,56 +429,28 @@ export default function ProPage() {
                     </div>
                   </div>
 
-                  {/* ETAPES */}
+                  {/* BOUTONS STATUTS (= étapes) */}
                   <div className="mt-5 flex flex-wrap gap-2">
-                    {steps.length === 0 ? (
-                      <button
-                        onClick={() => initStepsForProject(p.id)}
-                        className="rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-sm font-bold hover:bg-zinc-50 transition"
-                      >
-                        Initialiser les étapes
-                      </button>
-                    ) : (
-                      steps.map((s) => {
-                        const isEditing = editingStepId === s.id;
+                    {statuses.map((s) => {
+                      const isActive = (p.status_text ?? "") === s.label;
+                      const isBusy = updatingProjectId === p.id;
 
-                        return (
-                          <div key={s.id} className="inline-flex items-center">
-                            {isEditing ? (
-                              <input
-                                autoFocus
-                                value={editingValue}
-                                onChange={(e) => setEditingValue(e.target.value)}
-                                onBlur={() => saveEdit(s)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") saveEdit(s);
-                                  if (e.key === "Escape") {
-                                    setEditingStepId(null);
-                                    setEditingValue("");
-                                  }
-                                }}
-                                className="w-56 rounded-full border border-zinc-200 bg-white px-4 py-2 text-xs font-black outline-none focus:ring-2 focus:ring-black/10"
-                              />
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => toggleStep(s)}
-                                onDoubleClick={() => startEdit(s)}
-                                disabled={togglingStepId === s.id}
-                                className={`rounded-full px-4 py-2 text-xs font-black border transition ${
-                                  s.is_completed
-                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                                    : "bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50"
-                                } ${togglingStepId === s.id ? "opacity-50" : ""}`}
-                                title={`Étape ${s.order_index}`}
-                              >
-                                {s.label}
-                              </button>
-                            )}
-                          </div>
-                        );
-                      })
-                    )}
+                      return (
+                        <button
+                          key={`${p.id}-${s.label}`}
+                          onClick={() => setProjectStatus(p, s)}
+                          disabled={isBusy}
+                          className={`rounded-full px-4 py-2 text-xs font-black border transition ${
+                            isActive
+                              ? "bg-black text-white border-black"
+                              : "bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50"
+                          } ${isBusy ? "opacity-50" : ""}`}
+                          title={`${s.percent}%`}
+                        >
+                          {s.label}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               );
