@@ -62,7 +62,6 @@ function normalizeType(t: string | null | undefined) {
 }
 
 function makeAccessToken(clientName: string) {
-  // token simple et stable : slug + random 3 chiffres
   const slug = clientName
     .toLowerCase()
     .trim()
@@ -171,6 +170,7 @@ export default function ProPage() {
     }
   };
 
+  // ✅ Création dossier sécurisée: RPC DB transactionnelle
   const createDossier = async () => {
     if (creating) return;
 
@@ -183,66 +183,39 @@ export default function ProPage() {
       alert("Utilisateur non chargé.");
       return;
     }
-    if (credits <= 0) {
-      alert("Plus de crédits. Achète des dossiers.");
-      return;
-    }
 
     setCreating(true);
 
     const projectType = normalizeType(typeUi);
-    const defaults = STATUS_BY_TYPE[projectType] ?? STATUS_BY_TYPE.other;
-    const defaultStatus = defaults[0];
-
     const accessToken = makeAccessToken(name);
 
-    // ✅ INSERT avec TES colonnes uniquement
-    const { data: inserted, error: insErr } = await supabase
-      .from("projects")
-      .insert({
-        client_name: name,
-        progress_percent: defaultStatus.percent,
-        status_text: defaultStatus.label,
-        access_token: accessToken,
-        broker_email: userEmail,
-        drive_folder_url: null,
-        project_type: projectType,
-        owner_user_id: userId,
-      })
-      .select(
-        "id,created_at,client_name,progress_percent,status_text,access_token,broker_email,drive_folder_url,updated_at,project_type,owner_user_id"
-      )
-      .single();
+    // IMPORTANT : nécessite la function SQL create_project_with_credit(...)
+    const { error } = await supabase.rpc("create_project_with_credit", {
+      p_client_name: name,
+      p_project_type: projectType,
+      p_access_token: accessToken,
+    });
 
-    if (insErr) {
-      console.error("Erreur création projet:", insErr);
-      alert(`Erreur création dossier : ${insErr.message}`);
+    if (error) {
+      console.error("RPC create_project_with_credit error:", error);
+      alert(error.message);
       setCreating(false);
       return;
-    }
-
-    // décrément crédits
-    const nextCredits = credits - 1;
-    const { error: creditsErr } = await supabase
-      .from("credit_wallets")
-      .update({ credits: nextCredits, updated_at: new Date().toISOString() })
-      .eq("user_id", userId);
-
-    if (creditsErr) {
-      console.error("Erreur update crédits:", creditsErr);
-      alert("Dossier créé, mais crédits non mis à jour (RLS ?).");
-      // On continue, mais tu dois corriger RLS si besoin
     }
 
     setClientName("");
     setCreating(false);
 
-    // refresh
     await loadAll();
   };
 
+  // ✅ Update statut robuste (et on vérifie owner_user_id)
   const setProjectStatus = async (project: Project, status: StatusDef) => {
     if (updatingProjectId) return;
+    if (!userId) {
+      alert("Utilisateur non chargé.");
+      return;
+    }
 
     setUpdatingProjectId(project.id);
 
@@ -266,11 +239,12 @@ export default function ProPage() {
         progress_percent: clampPct(status.percent),
         updated_at: new Date().toISOString(),
       })
-      .eq("id", project.id);
+      .eq("id", project.id)
+      .eq("owner_user_id", userId);
 
     if (error) {
-      console.error("Erreur update status:", error);
-      alert("Impossible de mettre à jour le statut (RLS ?).");
+      console.error("Update status failed:", error);
+      alert(error.message);
       await loadAll(); // rollback
     }
 
@@ -319,7 +293,6 @@ export default function ProPage() {
             </p>
 
             <div className="mt-6 flex items-center gap-3">
-              {/* ✅ plus petit */}
               <a
                 href={stripeCheckoutUrl}
                 target="_blank"
@@ -329,7 +302,6 @@ export default function ProPage() {
                 Acheter des dossiers
               </a>
 
-              {/* ✅ plus petit */}
               <button
                 onClick={loadAll}
                 className="inline-flex items-center justify-center rounded-2xl bg-black text-white px-4 py-2 text-sm font-bold hover:bg-zinc-800 transition"
@@ -369,11 +341,18 @@ export default function ProPage() {
 
               <button
                 onClick={createDossier}
-                disabled={creating || credits <= 0}
+                disabled={creating}
                 className="mt-2 w-full rounded-2xl bg-black text-white px-6 py-4 font-black hover:bg-zinc-800 transition disabled:opacity-40"
               >
                 {creating ? "Création..." : "Créer (1 crédit)"}
               </button>
+
+              {/* petit rappel UX */}
+              {credits <= 0 && (
+                <div className="text-xs font-semibold text-zinc-500">
+                  Plus de crédits : utilise “Acheter des dossiers”.
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -391,6 +370,8 @@ export default function ProPage() {
               const statuses = STATUS_BY_TYPE[t] ?? STATUS_BY_TYPE.other;
               const progress = clampPct(p.progress_percent ?? 0);
 
+              const canUpdate = p.owner_user_id === userId;
+
               return (
                 <div key={p.id} className="rounded-3xl border border-zinc-200 bg-white p-6">
                   <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
@@ -405,9 +386,12 @@ export default function ProPage() {
                       <div className="mt-1 text-sm font-semibold text-zinc-600">
                         {(p.status_text ?? "—")} — {progress}%
                       </div>
-                      <div className="mt-1 text-xs text-zinc-500">
-                        Clique sur un bouton pour mettre à jour le dossier.
-                      </div>
+
+                      {!canUpdate && (
+                        <div className="mt-1 text-xs font-semibold text-red-600">
+                          owner_user_id manquant ou différent : update bloqué par RLS.
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-3">
@@ -439,12 +423,12 @@ export default function ProPage() {
                         <button
                           key={`${p.id}-${s.label}`}
                           onClick={() => setProjectStatus(p, s)}
-                          disabled={isBusy}
+                          disabled={isBusy || !canUpdate}
                           className={`rounded-full px-4 py-2 text-xs font-black border transition ${
                             isActive
                               ? "bg-black text-white border-black"
                               : "bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50"
-                          } ${isBusy ? "opacity-50" : ""}`}
+                          } ${(isBusy || !canUpdate) ? "opacity-50" : ""}`}
                           title={`${s.percent}%`}
                         >
                           {s.label}
