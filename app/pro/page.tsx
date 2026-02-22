@@ -13,8 +13,17 @@ type Project = {
   created_at?: string | null;
 };
 
-type Step = {
+type StepRow = {
   id?: string;
+  project_id: string;
+  order_index: number | null;
+  is_completed: boolean | null;
+  label?: string | null; // ton champ attendu
+  name?: string | null;  // fallback possible
+  title?: string | null; // fallback possible
+};
+
+type Step = {
   project_id: string;
   order_index: number;
   label: string;
@@ -39,8 +48,9 @@ function pct(n: number | null | undefined) {
 
 export default function ProPage() {
   const supabase = useMemo(() => getSupabaseBrowser(), []);
-  const [loading, setLoading] = useState(true);
 
+  const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState<string>("");
   const [userEmail, setUserEmail] = useState<string>("");
 
   const [credits, setCredits] = useState<number>(0);
@@ -59,42 +69,44 @@ export default function ProPage() {
 
     const {
       data: { user },
+      error: userErr,
     } = await supabase.auth.getUser();
+
+    if (userErr) console.error("auth.getUser error:", userErr);
 
     if (!user) {
       window.location.href = "/login";
       return;
     }
 
+    const uid = user.id;
     const email = user.email ?? "";
+
+    setUserId(uid);
     setUserEmail(email);
 
     // ============================
-    // 1) CHARGER CREDITS
+    // 1) CREDITS depuis credit_wallets
     // ============================
-    // ✅ ADAPTE ICI SI BESOIN :
-    // - Table: "brokers"
-    // - Colonne: "credits"
-    const { data: brokerRow, error: brokerErr } = await supabase
-      .from("brokers")
+    const { data: walletRow, error: walletErr } = await supabase
+      .from("credit_wallets")
       .select("credits")
-      .eq("email", email)
+      .eq("user_id", uid)
       .maybeSingle();
 
-    if (brokerErr) {
-      console.error("Erreur credits:", brokerErr);
-      // On ne bloque pas toute la page
+    if (walletErr) {
+      console.error("Erreur credit_wallets:", walletErr);
       setCredits(0);
     } else {
-      setCredits(Number(brokerRow?.credits ?? 0));
+      setCredits(Number(walletRow?.credits ?? 0));
     }
 
     // ============================
-    // 2) CHARGER PROJETS
+    // 2) PROJETS
     // ============================
     const { data: projectsData, error: projectsErr } = await supabase
       .from("projects")
-      .select("*")
+      .select("id, client_name, status_text, progress_percent, access_token, project_type, created_at")
       .eq("broker_email", email)
       .order("created_at", { ascending: false });
 
@@ -110,7 +122,7 @@ export default function ProPage() {
     setProjects(list);
 
     // ============================
-    // 3) CHARGER ETAPES
+    // 3) ETAPES
     // ============================
     if (list.length === 0) {
       setStepsMap({});
@@ -120,9 +132,10 @@ export default function ProPage() {
 
     const projectIds = list.map((p) => p.id);
 
+    // IMPORTANT: on récupère aussi name/title au cas où label n’existe pas
     const { data: stepsData, error: stepsErr } = await supabase
       .from("steps")
-      .select("*")
+      .select("id, project_id, order_index, is_completed, label, name, title")
       .in("project_id", projectIds)
       .order("order_index", { ascending: true });
 
@@ -134,16 +147,23 @@ export default function ProPage() {
     }
 
     const map: Record<string, Step[]> = {};
-    (stepsData ?? []).forEach((s: any) => {
+    (stepsData ?? []).forEach((s: StepRow) => {
+      const pid = s.project_id;
+      const order = typeof s.order_index === "number" ? s.order_index : 0;
+
+      const lbl =
+        (s.label ?? s.name ?? s.title ?? "").trim() ||
+        `Étape ${order}`;
+
       const step: Step = {
-        id: s.id,
-        project_id: s.project_id,
-        order_index: s.order_index,
-        label: s.label,
+        project_id: pid,
+        order_index: order,
+        label: lbl,
         is_completed: !!s.is_completed,
       };
-      if (!map[step.project_id]) map[step.project_id] = [];
-      map[step.project_id].push(step);
+
+      if (!map[pid]) map[pid] = [];
+      map[pid].push(step);
     });
 
     setStepsMap(map);
@@ -166,7 +186,6 @@ export default function ProPage() {
       await navigator.clipboard.writeText(url);
       alert("Lien copié.");
     } catch {
-      // fallback
       prompt("Copie le lien :", url);
     }
   };
@@ -180,6 +199,11 @@ export default function ProPage() {
       return;
     }
 
+    if (!userId) {
+      alert("Utilisateur non chargé.");
+      return;
+    }
+
     if (credits <= 0) {
       alert("Plus de crédits. Achète des dossiers.");
       return;
@@ -188,24 +212,22 @@ export default function ProPage() {
     setCreating(true);
 
     // 1) Créer le projet
-    // ⚠️ ADAPTE si tes colonnes diffèrent (project_type, status_text, progress_percent, etc.)
     const { data: inserted, error: insErr } = await supabase
       .from("projects")
       .insert({
         client_name: trimmedClient,
         project_type: type,
-        // si tu as un champ "dossier_name" chez toi, remplace/ajoute ici
         dossier_name: dossierName.trim() || null,
         status_text: "Dossier en cours",
         progress_percent: 0,
         broker_email: userEmail,
         drive_folder_url: null,
       })
-      .select("*")
+      .select("id, client_name, status_text, progress_percent, access_token, project_type, created_at")
       .single();
 
     if (insErr) {
-      console.error(insErr);
+      console.error("Erreur création projet:", insErr);
       alert("Erreur création dossier.");
       setCreating(false);
       return;
@@ -213,40 +235,40 @@ export default function ProPage() {
 
     const newProject = inserted as Project;
 
-    // 2) Créer les étapes (si tu ne le fais pas déjà ailleurs)
-    // Si ton backend crée automatiquement les steps via trigger, tu peux supprimer ce bloc.
-    const stepsPayload = DEFAULT_STEPS.map((s, idx) => ({
+    // 2) Créer les étapes (si tu n’as pas de trigger DB)
+    const stepsPayload = DEFAULT_STEPS.map((st, idx) => ({
       project_id: newProject.id,
       order_index: idx + 1,
-      label: s.label,
+      label: st.label,
       is_completed: false,
     }));
 
     const { error: stepsCreateErr } = await supabase.from("steps").insert(stepsPayload);
     if (stepsCreateErr) {
       console.error("Erreur insert steps:", stepsCreateErr);
-      // On n’empêche pas l’existence du projet, mais c’est à corriger
+      // on continue : le dossier existe
     }
 
-    // 3) Décrémenter les crédits
-    // ✅ ADAPTE ICI SI BESOIN :
-    // - Table: "brokers"
-    // - Colonne: "credits"
+    // 3) Décrémenter les crédits dans credit_wallets
+    const nextCredits = credits - 1;
+
     const { error: creditsErr } = await supabase
-      .from("brokers")
-      .update({ credits: credits - 1 })
-      .eq("email", userEmail);
+      .from("credit_wallets")
+      .update({
+        credits: nextCredits,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", userId);
 
     if (creditsErr) {
       console.error("Erreur décrément credits:", creditsErr);
-      // le dossier existe, mais crédits pas à jour → à corriger
+      // dossier OK, crédits pas à jour → à corriger côté DB/RLS
     }
 
     setClientName("");
     setDossierName("");
     setCreating(false);
 
-    // refresh
     await loadAll();
   };
 
@@ -430,16 +452,16 @@ export default function ProPage() {
                     </div>
                   </div>
 
-                  {/* ÉTAPES (avec labels) */}
+                  {/* ÉTAPES (labels) */}
                   <div className="mt-5 flex flex-wrap gap-2">
                     {steps.length === 0 ? (
                       <div className="text-sm text-zinc-500">
-                        Aucune étape trouvée.
+                        Aucune étape affichée. (RLS ou données steps absentes)
                       </div>
                     ) : (
                       steps.map((s) => (
                         <div
-                          key={`${p.id}-${s.order_index}`}
+                          key={`${p.id}-${s.order_index}-${s.label}`}
                           className={`rounded-full px-4 py-2 text-xs font-black border ${
                             s.is_completed
                               ? "bg-emerald-50 text-emerald-700 border-emerald-200"
