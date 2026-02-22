@@ -14,16 +14,17 @@ type Project = {
 };
 
 type StepRow = {
-  id?: string;
+  id: string;
   project_id: string;
   order_index: number | null;
   is_completed: boolean | null;
-  label?: string | null; // ton champ attendu
-  name?: string | null;  // fallback possible
-  title?: string | null; // fallback possible
+  label?: string | null;
+  name?: string | null;
+  title?: string | null;
 };
 
 type Step = {
+  id: string;
   project_id: string;
   order_index: number;
   label: string;
@@ -64,6 +65,11 @@ export default function ProPage() {
   const [dossierName, setDossierName] = useState<string>("");
   const [creating, setCreating] = useState(false);
 
+  // steps editing / updating
+  const [togglingStepId, setTogglingStepId] = useState<string | null>(null);
+  const [editingStepId, setEditingStepId] = useState<string | null>(null);
+  const [editingValue, setEditingValue] = useState<string>("");
+
   const loadAll = async () => {
     setLoading(true);
 
@@ -85,9 +91,7 @@ export default function ProPage() {
     setUserId(uid);
     setUserEmail(email);
 
-    // ============================
     // 1) CREDITS depuis credit_wallets
-    // ============================
     const { data: walletRow, error: walletErr } = await supabase
       .from("credit_wallets")
       .select("credits")
@@ -101,9 +105,7 @@ export default function ProPage() {
       setCredits(Number(walletRow?.credits ?? 0));
     }
 
-    // ============================
     // 2) PROJETS
-    // ============================
     const { data: projectsData, error: projectsErr } = await supabase
       .from("projects")
       .select("id, client_name, status_text, progress_percent, access_token, project_type, created_at")
@@ -121,9 +123,7 @@ export default function ProPage() {
     const list = (projectsData ?? []) as Project[];
     setProjects(list);
 
-    // ============================
     // 3) ETAPES
-    // ============================
     if (list.length === 0) {
       setStepsMap({});
       setLoading(false);
@@ -132,7 +132,6 @@ export default function ProPage() {
 
     const projectIds = list.map((p) => p.id);
 
-    // IMPORTANT: on récupère aussi name/title au cas où label n’existe pas
     const { data: stepsData, error: stepsErr } = await supabase
       .from("steps")
       .select("id, project_id, order_index, is_completed, label, name, title")
@@ -156,6 +155,7 @@ export default function ProPage() {
         `Étape ${order}`;
 
       const step: Step = {
+        id: s.id,
         project_id: pid,
         order_index: order,
         label: lbl,
@@ -211,7 +211,6 @@ export default function ProPage() {
 
     setCreating(true);
 
-    // 1) Créer le projet
     const { data: inserted, error: insErr } = await supabase
       .from("projects")
       .insert({
@@ -235,7 +234,7 @@ export default function ProPage() {
 
     const newProject = inserted as Project;
 
-    // 2) Créer les étapes (si tu n’as pas de trigger DB)
+    // Crée les étapes par défaut
     const stepsPayload = DEFAULT_STEPS.map((st, idx) => ({
       project_id: newProject.id,
       order_index: idx + 1,
@@ -246,12 +245,10 @@ export default function ProPage() {
     const { error: stepsCreateErr } = await supabase.from("steps").insert(stepsPayload);
     if (stepsCreateErr) {
       console.error("Erreur insert steps:", stepsCreateErr);
-      // on continue : le dossier existe
     }
 
-    // 3) Décrémenter les crédits dans credit_wallets
+    // Décrément crédits
     const nextCredits = credits - 1;
-
     const { error: creditsErr } = await supabase
       .from("credit_wallets")
       .update({
@@ -262,7 +259,6 @@ export default function ProPage() {
 
     if (creditsErr) {
       console.error("Erreur décrément credits:", creditsErr);
-      // dossier OK, crédits pas à jour → à corriger côté DB/RLS
     }
 
     setClientName("");
@@ -270,6 +266,90 @@ export default function ProPage() {
     setCreating(false);
 
     await loadAll();
+  };
+
+  // ✅ Toggle étape: clic
+  const toggleStep = async (step: Step) => {
+    if (togglingStepId) return;
+
+    setTogglingStepId(step.id);
+
+    // Optimistic UI
+    setStepsMap((prev) => {
+      const next = { ...prev };
+      const arr = (next[step.project_id] || []).map((s) =>
+        s.id === step.id ? { ...s, is_completed: !s.is_completed } : s
+      );
+      next[step.project_id] = arr;
+      return next;
+    });
+
+    const { error } = await supabase
+      .from("steps")
+      .update({ is_completed: !step.is_completed })
+      .eq("id", step.id);
+
+    if (error) {
+      console.error("Erreur toggle step:", error);
+      alert("Impossible de mettre à jour l'étape. (RLS ?)");
+      // rollback = reload
+      await loadAll();
+    }
+
+    setTogglingStepId(null);
+  };
+
+  // ✅ Init étapes si un projet n’en a pas
+  const initStepsForProject = async (projectId: string) => {
+    const payload = DEFAULT_STEPS.map((st, idx) => ({
+      project_id: projectId,
+      order_index: idx + 1,
+      label: st.label,
+      is_completed: false,
+    }));
+
+    const { error } = await supabase.from("steps").insert(payload);
+    if (error) {
+      console.error("Erreur init steps:", error);
+      alert("Impossible de créer les étapes. (RLS ?)");
+      return;
+    }
+
+    await loadAll();
+  };
+
+  // ✅ Edit label: double-clic -> input -> enter/blur save
+  const startEdit = (step: Step) => {
+    setEditingStepId(step.id);
+    setEditingValue(step.label);
+  };
+
+  const saveEdit = async (step: Step) => {
+    const newLabel = editingValue.trim();
+    setEditingStepId(null);
+
+    if (!newLabel) {
+      alert("Le nom de l'étape ne peut pas être vide.");
+      await loadAll();
+      return;
+    }
+
+    // Optimistic UI
+    setStepsMap((prev) => {
+      const next = { ...prev };
+      const arr = (next[step.project_id] || []).map((s) =>
+        s.id === step.id ? { ...s, label: newLabel } : s
+      );
+      next[step.project_id] = arr;
+      return next;
+    });
+
+    const { error } = await supabase.from("steps").update({ label: newLabel }).eq("id", step.id);
+    if (error) {
+      console.error("Erreur update label:", error);
+      alert("Impossible de renommer l'étape. (RLS ?)");
+      await loadAll();
+    }
   };
 
   const stripeCheckoutUrl = `https://buy.stripe.com/eVq8wQ3kJ7vWc2x58veIw00?prefilled_email=${encodeURIComponent(
@@ -306,15 +386,11 @@ export default function ProPage() {
         <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* CREDITS */}
           <div className="rounded-3xl border border-zinc-200 bg-white shadow-sm p-8">
-            <div className="text-xs font-black tracking-widest text-zinc-400">
-              CRÉDITS
-            </div>
+            <div className="text-xs font-black tracking-widest text-zinc-400">CRÉDITS</div>
 
             <div className="mt-4 flex items-end gap-3">
               <div className="text-6xl font-black leading-none">{credits}</div>
-              <div className="pb-2 text-zinc-600 font-semibold">
-                dossiers restants
-              </div>
+              <div className="pb-2 text-zinc-600 font-semibold">dossiers restants</div>
             </div>
 
             <p className="mt-3 text-sm text-zinc-500 font-semibold">
@@ -322,7 +398,7 @@ export default function ProPage() {
             </p>
 
             <div className="mt-6 flex items-center gap-3">
-              {/* ✅ plus petit */}
+              {/* plus petit */}
               <a
                 href={stripeCheckoutUrl}
                 target="_blank"
@@ -332,7 +408,7 @@ export default function ProPage() {
                 Acheter des dossiers
               </a>
 
-              {/* ✅ plus petit */}
+              {/* plus petit */}
               <button
                 onClick={loadAll}
                 className="inline-flex items-center justify-center rounded-2xl bg-black text-white px-4 py-2 text-sm font-bold hover:bg-zinc-800 transition"
@@ -344,15 +420,11 @@ export default function ProPage() {
 
           {/* CREATE DOSSIER */}
           <div className="rounded-3xl border border-zinc-200 bg-white shadow-sm p-8">
-            <div className="text-xs font-black tracking-widest text-zinc-400">
-              CRÉER UN DOSSIER
-            </div>
+            <div className="text-xs font-black tracking-widest text-zinc-400">CRÉER UN DOSSIER</div>
 
             <div className="mt-6 space-y-4">
               <div>
-                <div className="text-xs font-black tracking-widest text-zinc-400">
-                  TYPE
-                </div>
+                <div className="text-xs font-black tracking-widest text-zinc-400">TYPE</div>
                 <select
                   value={type}
                   onChange={(e) => setType(e.target.value)}
@@ -366,9 +438,7 @@ export default function ProPage() {
               </div>
 
               <div>
-                <div className="text-xs font-black tracking-widest text-zinc-400">
-                  CLIENT
-                </div>
+                <div className="text-xs font-black tracking-widest text-zinc-400">CLIENT</div>
                 <input
                   value={clientName}
                   onChange={(e) => setClientName(e.target.value)}
@@ -403,9 +473,7 @@ export default function ProPage() {
         {/* DOSSIERS */}
         <div className="mt-8 rounded-3xl border border-zinc-200 bg-white shadow-sm p-8">
           <div className="flex items-center justify-between">
-            <div className="text-xs font-black tracking-widest text-zinc-400">
-              DOSSIERS
-            </div>
+            <div className="text-xs font-black tracking-widest text-zinc-400">DOSSIERS</div>
             <div className="text-sm font-black text-zinc-500">{projects.length}</div>
           </div>
 
@@ -415,10 +483,7 @@ export default function ProPage() {
               const progress = pct(p.progress_percent);
 
               return (
-                <div
-                  key={p.id}
-                  className="rounded-3xl border border-zinc-200 bg-white p-6"
-                >
+                <div key={p.id} className="rounded-3xl border border-zinc-200 bg-white p-6">
                   <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                     <div>
                       <div className="flex items-center gap-2">
@@ -430,6 +495,9 @@ export default function ProPage() {
 
                       <div className="mt-1 text-sm font-semibold text-zinc-600">
                         {(p.status_text ?? "Dossier en cours")} — {progress}%
+                      </div>
+                      <div className="mt-1 text-xs text-zinc-500">
+                        Clic = valider / invalider. Double-clic = renommer.
                       </div>
                     </div>
 
@@ -452,26 +520,55 @@ export default function ProPage() {
                     </div>
                   </div>
 
-                  {/* ÉTAPES (labels) */}
+                  {/* ETAPES */}
                   <div className="mt-5 flex flex-wrap gap-2">
                     {steps.length === 0 ? (
-                      <div className="text-sm text-zinc-500">
-                        Aucune étape affichée. (RLS ou données steps absentes)
-                      </div>
+                      <button
+                        onClick={() => initStepsForProject(p.id)}
+                        className="rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-sm font-bold hover:bg-zinc-50 transition"
+                      >
+                        Initialiser les étapes
+                      </button>
                     ) : (
-                      steps.map((s) => (
-                        <div
-                          key={`${p.id}-${s.order_index}-${s.label}`}
-                          className={`rounded-full px-4 py-2 text-xs font-black border ${
-                            s.is_completed
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                              : "bg-white text-zinc-700 border-zinc-200"
-                          }`}
-                          title={`Étape ${s.order_index}`}
-                        >
-                          {s.label}
-                        </div>
-                      ))
+                      steps.map((s) => {
+                        const isEditing = editingStepId === s.id;
+
+                        return (
+                          <div key={s.id} className="inline-flex items-center">
+                            {isEditing ? (
+                              <input
+                                autoFocus
+                                value={editingValue}
+                                onChange={(e) => setEditingValue(e.target.value)}
+                                onBlur={() => saveEdit(s)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") saveEdit(s);
+                                  if (e.key === "Escape") {
+                                    setEditingStepId(null);
+                                    setEditingValue("");
+                                  }
+                                }}
+                                className="w-56 rounded-full border border-zinc-200 bg-white px-4 py-2 text-xs font-black outline-none focus:ring-2 focus:ring-black/10"
+                              />
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => toggleStep(s)}
+                                onDoubleClick={() => startEdit(s)}
+                                disabled={togglingStepId === s.id}
+                                className={`rounded-full px-4 py-2 text-xs font-black border transition ${
+                                  s.is_completed
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                                    : "bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50"
+                                } ${togglingStepId === s.id ? "opacity-50" : ""}`}
+                                title={`Étape ${s.order_index}`}
+                              >
+                                {s.label}
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })
                     )}
                   </div>
                 </div>
@@ -479,9 +576,7 @@ export default function ProPage() {
             })}
 
             {projects.length === 0 && (
-              <div className="text-sm text-zinc-500">
-                Aucun dossier pour le moment.
-              </div>
+              <div className="text-sm text-zinc-500">Aucun dossier pour le moment.</div>
             )}
           </div>
         </div>
