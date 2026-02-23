@@ -334,7 +334,7 @@ export default function ProPage() {
                 <input
                   value={clientName}
                   onChange={(e) => setClientName(e.target.value)}
-                  placeholder="ex: Nabil / Mme Martin"
+                  placeholder="ex: Mr ou Mme xxxxx"
                   className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 font-semibold outline-none focus:ring-2 focus:ring-black/10"
                 />
               </div>
