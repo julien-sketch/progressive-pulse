@@ -8,7 +8,7 @@ type Project = {
   created_at: string | null;
   client_name: string;
   progress_percent: number | null;
-  status_text: string | null;
+  status_text: string | null; // ✅ étape en cours (recalculée)
   access_token: string;
   broker_email: string | null;
   drive_folder_url: string | null;
@@ -31,20 +31,16 @@ const STEPS_BY_TYPE: Record<string, StepDef[]> = {
     { label: "Acte authentique signé" },
   ],
   of: [
-  { label: "Documents reçus" },
-  { label: "Dossier complet" },
-  { label: "Dépôt effectué auprès du fonds de formation" },
-  { label: "En attente de validation" },
-  { label: "Demande acceptée" },
-  { label: "Documents de fin de formation transmis" },
-  { label: "Remboursement en cours" },
-  { label: "Paiement validé" },
-],
-  other: [
     { label: "Documents reçus" },
     { label: "Dossier complet" },
-    { label: "Terminé" },
+    { label: "Dépôt effectué auprès du fonds de formation" },
+    { label: "En attente de validation" },
+    { label: "Demande acceptée" },
+    { label: "Documents de fin de formation transmis" },
+    { label: "Remboursement en cours" },
+    { label: "Paiement validé" },
   ],
+  other: [{ label: "Documents reçus" }, { label: "Dossier complet" }, { label: "Terminé" }],
 };
 
 function clampPct(n: number | null | undefined) {
@@ -83,11 +79,13 @@ export default function ProPage() {
   const [credits, setCredits] = useState<number>(0);
   const [projects, setProjects] = useState<Project[]>([]);
 
+  // create
   const [typeUi, setTypeUi] = useState<string>("Immobilier");
   const [clientName, setClientName] = useState<string>("");
   const [creating, setCreating] = useState(false);
 
   const [updatingProjectId, setUpdatingProjectId] = useState<string | null>(null);
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
 
   const stripeCheckoutUrl = `https://buy.stripe.com/eVq8wQ3kJ7vWc2x58veIw00?prefilled_email=${encodeURIComponent(
     userEmail || ""
@@ -170,23 +168,14 @@ export default function ProPage() {
     if (creating) return;
 
     const name = clientName.trim();
-    if (!name) {
-      alert("Renseigne le nom du client.");
-      return;
-    }
-    if (!userId || !userEmail) {
-      alert("Utilisateur non chargé.");
-      return;
-    }
+    if (!name) return alert("Renseigne le nom du client.");
+    if (!userId || !userEmail) return alert("Utilisateur non chargé.");
 
     setCreating(true);
 
     const projectType = normalizeType(typeUi);
     const accessToken = makeAccessToken(name);
 
-    // ⚠️ IMPORTANT :
-    // ta function create_project_with_credit doit aussi créer les project_steps,
-    // sinon tes dossiers "nouveaux" n'auront pas d'étapes.
     const { error } = await supabase.rpc("create_project_with_credit", {
       p_client_name: name,
       p_project_type: projectType,
@@ -202,17 +191,12 @@ export default function ProPage() {
 
     setClientName("");
     setCreating(false);
-
     await loadAll();
   };
 
-  // ✅ Mise à jour steps (source de vérité)
   const setProjectStep = async (project: Project, stepIndex1Based: number) => {
     if (updatingProjectId) return;
-    if (!userId) {
-      alert("Utilisateur non chargé.");
-      return;
-    }
+    if (!userId) return alert("Utilisateur non chargé.");
 
     setUpdatingProjectId(project.id);
 
@@ -230,6 +214,50 @@ export default function ProPage() {
     await loadAll();
   };
 
+  // ✅ Supprimer dossier (steps puis project)
+  const deleteDossier = async (project: Project) => {
+    if (deletingProjectId) return;
+    if (!userId) return alert("Utilisateur non chargé.");
+    if (project.owner_user_id !== userId) return alert("Suppression refusée (owner_user_id).");
+
+    const ok = confirm(
+      `Supprimer définitivement le dossier "${project.client_name}" ?\n\nCette action est irréversible.`
+    );
+    if (!ok) return;
+
+    setDeletingProjectId(project.id);
+
+    // 1) supprimer steps
+    const { error: delStepsErr } = await supabase
+      .from("project_steps")
+      .delete()
+      .eq("project_id", project.id);
+
+    if (delStepsErr) {
+      console.error("delete project_steps error:", delStepsErr);
+      alert(delStepsErr.message);
+      setDeletingProjectId(null);
+      return;
+    }
+
+    // 2) supprimer project
+    const { error: delProjErr } = await supabase
+      .from("projects")
+      .delete()
+      .eq("id", project.id)
+      .eq("owner_user_id", userId);
+
+    if (delProjErr) {
+      console.error("delete project error:", delProjErr);
+      alert(delProjErr.message);
+      setDeletingProjectId(null);
+      return;
+    }
+
+    setDeletingProjectId(null);
+    await loadAll();
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -241,6 +269,7 @@ export default function ProPage() {
   return (
     <div className="min-h-screen bg-white px-6 py-8">
       <div className="max-w-6xl mx-auto">
+        {/* HEADER */}
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-4xl font-black tracking-tight">Dashboard Pro</h1>
@@ -255,7 +284,9 @@ export default function ProPage() {
           </button>
         </div>
 
+        {/* TOP GRID */}
         <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* CREDITS */}
           <div className="rounded-3xl border border-zinc-200 bg-white shadow-sm p-8">
             <div className="text-xs font-black tracking-widest text-zinc-400">CRÉDITS</div>
 
@@ -287,6 +318,7 @@ export default function ProPage() {
             </div>
           </div>
 
+          {/* CREATE DOSSIER */}
           <div className="rounded-3xl border border-zinc-200 bg-white shadow-sm p-8">
             <div className="text-xs font-black tracking-widest text-zinc-400">CRÉER UN DOSSIER</div>
 
@@ -331,6 +363,7 @@ export default function ProPage() {
           </div>
         </div>
 
+        {/* DOSSIERS */}
         <div className="mt-8 rounded-3xl border border-zinc-200 bg-white shadow-sm p-8">
           <div className="flex items-center justify-between">
             <div className="text-xs font-black tracking-widest text-zinc-400">DOSSIERS</div>
@@ -345,25 +378,33 @@ export default function ProPage() {
 
               const canUpdate = p.owner_user_id === userId;
               const isBusy = updatingProjectId === p.id;
+              const isDeleting = deletingProjectId === p.id;
+
+              // ✅ étape en cours = status_text (recalculée)
+              const currentStep = p.status_text ?? "—";
 
               return (
                 <div key={p.id} className="rounded-3xl border border-zinc-200 bg-white p-6">
                   <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                    <div>
-                      <div className="flex items-center gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <div className="text-xl font-black">{p.client_name}</div>
                         <div className="text-xs font-black tracking-widest text-zinc-400">
                           • {t.toUpperCase()}
                         </div>
+
+                        <span className="inline-flex items-center rounded-full bg-zinc-100 px-3 py-1 text-xs font-black text-zinc-700">
+                          Étape en cours : {currentStep}
+                        </span>
                       </div>
 
-                      <div className="mt-1 text-sm font-semibold text-zinc-600">
-                        {(p.status_text ?? "—")} — {progress}%
+                      <div className="mt-2 text-sm font-semibold text-zinc-600">
+                        Progression : {progress}%
                       </div>
 
                       {!canUpdate && (
                         <div className="mt-1 text-xs font-semibold text-red-600">
-                          owner_user_id manquant ou différent : update bloqué par RLS.
+                          owner_user_id manquant ou différent : actions bloquées.
                         </div>
                       )}
                     </div>
@@ -384,22 +425,30 @@ export default function ProPage() {
                       >
                         Ouvrir
                       </a>
+
+                      <button
+                        onClick={() => deleteDossier(p)}
+                        disabled={!canUpdate || isDeleting}
+                        className="rounded-2xl border border-red-200 bg-white px-4 py-2 text-sm font-black text-red-600 hover:bg-red-50 transition disabled:opacity-50"
+                        title="Supprimer le dossier"
+                      >
+                        {isDeleting ? "Suppression..." : "Supprimer"}
+                      </button>
                     </div>
                   </div>
 
-                  {/* ✅ Boutons = étapes (1..N) */}
+                  {/* Boutons étapes */}
                   <div className="mt-5 flex flex-wrap gap-2">
                     {stepsDef.map((s, idx) => {
                       const stepIndex = idx + 1;
-
                       return (
                         <button
                           key={`${p.id}-${s.label}`}
                           onClick={() => setProjectStep(p, stepIndex)}
-                          disabled={!canUpdate || isBusy}
-                          className={`rounded-full px-4 py-2 text-xs font-black border transition ${
-                            "bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50"
-                          } ${(!canUpdate || isBusy) ? "opacity-50" : ""}`}
+                          disabled={!canUpdate || isBusy || isDeleting}
+                          className={`rounded-full px-4 py-2 text-xs font-black border transition
+                            bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50
+                            ${(!canUpdate || isBusy || isDeleting) ? "opacity-50" : ""}`}
                           title={`Étape ${stepIndex}`}
                         >
                           {s.label}
