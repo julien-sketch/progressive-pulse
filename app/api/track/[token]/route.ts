@@ -21,10 +21,11 @@ export async function GET(req: Request) {
 
   const supabase = getSupabaseAdmin();
 
+  // ✅ IMPORTANT : on renvoie project_type (sinon le client ne sait pas quel template afficher)
   const { data: project, error: projectError } = await supabase
     .from("projects")
     .select(
-      "id, client_name, progress_percent, status_text, created_at, updated_at, broker_email, drive_folder_url, access_token"
+      "id, client_name, progress_percent, status_text, created_at, updated_at, broker_email, drive_folder_url, access_token, project_type"
     )
     .eq("access_token", token)
     .maybeSingle();
@@ -36,6 +37,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  // ✅ Tu utilises "project_steps" (pas "steps")
   const { data: steps, error: stepsError } = await supabase
     .from("project_steps")
     .select("order_index, label, is_completed")

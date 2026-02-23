@@ -17,40 +17,37 @@ type Project = {
   owner_user_id: string | null;
 };
 
-type StatusDef = {
-  label: string;
-  percent: number;
-};
+type StepDef = { label: string };
 
-const STATUS_BY_TYPE: Record<string, StatusDef[]> = {
+const STEPS_BY_TYPE: Record<string, StepDef[]> = {
   immo: [
-    { label: "Mandat non confirmé", percent: 0 },
-    { label: "Mandat signé", percent: 10 },
-    { label: "Documents reçus", percent: 25 },
-    { label: "Dossier complet", percent: 35 },
-    { label: "Visites en cours", percent: 50 },
-    { label: "Offre acceptée", percent: 70 },
-    { label: "Compromis signé", percent: 80 },
-    { label: "Délai de rétractation", percent: 88 },
-    { label: "Acte signé", percent: 100 },
+    { label: "Mandat signé" },
+    { label: "Shooting photo réalisé" },
+    { label: "Annonce publiée" },
+    { label: "Visites en cours" },
+    { label: "Offre acceptée" },
+    { label: "Compromis signé" },
+    { label: "Délai de rétractation" },
+    { label: "Acte authentique signé" },
   ],
   of: [
-    { label: "Documents reçus", percent: 0 },
-    { label: "Dossier complet", percent: 25 },
-    { label: "Dépôt effectué auprès du fonds de formation", percent: 38 },
-    { label: "En attente de validation", percent: 50 },
-    { label: "Validé", percent: 80 },
-    { label: "Financement reçu", percent: 100 },
+    { label: "Documents reçus" },
+    { label: "Dossier complet" },
+    { label: "Dépôt effectué auprès du fonds de formation" },
+    { label: "En attente de validation" },
+    { label: "Validé" },
+    { label: "Financement reçu" },
   ],
   other: [
-    { label: "Documents reçus", percent: 0 },
-    { label: "Dossier complet", percent: 50 },
-    { label: "Terminé", percent: 100 },
+    { label: "Documents reçus" },
+    { label: "Dossier complet" },
+    { label: "Terminé" },
   ],
 };
 
-function clampPct(n: number) {
-  return Math.max(0, Math.min(100, Math.round(n)));
+function clampPct(n: number | null | undefined) {
+  const v = typeof n === "number" ? n : 0;
+  return Math.max(0, Math.min(100, Math.round(v)));
 }
 
 function normalizeType(t: string | null | undefined) {
@@ -70,7 +67,7 @@ function makeAccessToken(clientName: string) {
     .replace(/^-+|-+$/g, "")
     .slice(0, 30);
 
-  const rnd = Math.floor(100 + Math.random() * 900); // 100-999
+  const rnd = Math.floor(100 + Math.random() * 900);
   return `${slug || "client"}-${rnd}`;
 }
 
@@ -84,7 +81,6 @@ export default function ProPage() {
   const [credits, setCredits] = useState<number>(0);
   const [projects, setProjects] = useState<Project[]>([]);
 
-  // create
   const [typeUi, setTypeUi] = useState<string>("Immobilier");
   const [clientName, setClientName] = useState<string>("");
   const [creating, setCreating] = useState(false);
@@ -116,7 +112,6 @@ export default function ProPage() {
     setUserId(uid);
     setUserEmail(email);
 
-    // credits
     const { data: walletRow, error: walletErr } = await supabase
       .from("credit_wallets")
       .select("credits")
@@ -130,7 +125,6 @@ export default function ProPage() {
       setCredits(Number(walletRow?.credits ?? 0));
     }
 
-    // projects
     const { data: projectsData, error: projectsErr } = await supabase
       .from("projects")
       .select(
@@ -170,7 +164,6 @@ export default function ProPage() {
     }
   };
 
-  // ✅ Création dossier sécurisée: RPC DB transactionnelle
   const createDossier = async () => {
     if (creating) return;
 
@@ -189,7 +182,9 @@ export default function ProPage() {
     const projectType = normalizeType(typeUi);
     const accessToken = makeAccessToken(name);
 
-    // IMPORTANT : nécessite la function SQL create_project_with_credit(...)
+    // ⚠️ IMPORTANT :
+    // ta function create_project_with_credit doit aussi créer les project_steps,
+    // sinon tes dossiers "nouveaux" n'auront pas d'étapes.
     const { error } = await supabase.rpc("create_project_with_credit", {
       p_client_name: name,
       p_project_type: projectType,
@@ -209,8 +204,8 @@ export default function ProPage() {
     await loadAll();
   };
 
-  // ✅ Update statut robuste (et on vérifie owner_user_id)
-  const setProjectStatus = async (project: Project, status: StatusDef) => {
+  // ✅ Mise à jour steps (source de vérité)
+  const setProjectStep = async (project: Project, stepIndex1Based: number) => {
     if (updatingProjectId) return;
     if (!userId) {
       alert("Utilisateur non chargé.");
@@ -219,36 +214,18 @@ export default function ProPage() {
 
     setUpdatingProjectId(project.id);
 
-    // optimistic UI
-    setProjects((prev) =>
-      prev.map((p) =>
-        p.id === project.id
-          ? {
-              ...p,
-              status_text: status.label,
-              progress_percent: clampPct(status.percent),
-            }
-          : p
-      )
-    );
-
-    const { error } = await supabase
-      .from("projects")
-      .update({
-        status_text: status.label,
-        progress_percent: clampPct(status.percent),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", project.id)
-      .eq("owner_user_id", userId);
+    const { error } = await supabase.rpc("set_project_step", {
+      p_project_id: project.id,
+      p_step_index: stepIndex1Based,
+    });
 
     if (error) {
-      console.error("Update status failed:", error);
+      console.error("set_project_step error:", error);
       alert(error.message);
-      await loadAll(); // rollback
     }
 
     setUpdatingProjectId(null);
+    await loadAll();
   };
 
   if (loading) {
@@ -262,7 +239,6 @@ export default function ProPage() {
   return (
     <div className="min-h-screen bg-white px-6 py-8">
       <div className="max-w-6xl mx-auto">
-        {/* HEADER */}
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-4xl font-black tracking-tight">Dashboard Pro</h1>
@@ -277,9 +253,7 @@ export default function ProPage() {
           </button>
         </div>
 
-        {/* TOP GRID */}
         <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* CREDITS */}
           <div className="rounded-3xl border border-zinc-200 bg-white shadow-sm p-8">
             <div className="text-xs font-black tracking-widest text-zinc-400">CRÉDITS</div>
 
@@ -311,7 +285,6 @@ export default function ProPage() {
             </div>
           </div>
 
-          {/* CREATE DOSSIER */}
           <div className="rounded-3xl border border-zinc-200 bg-white shadow-sm p-8">
             <div className="text-xs font-black tracking-widest text-zinc-400">CRÉER UN DOSSIER</div>
 
@@ -347,7 +320,6 @@ export default function ProPage() {
                 {creating ? "Création..." : "Créer (1 crédit)"}
               </button>
 
-              {/* petit rappel UX */}
               {credits <= 0 && (
                 <div className="text-xs font-semibold text-zinc-500">
                   Plus de crédits : utilise “Acheter des dossiers”.
@@ -357,7 +329,6 @@ export default function ProPage() {
           </div>
         </div>
 
-        {/* DOSSIERS */}
         <div className="mt-8 rounded-3xl border border-zinc-200 bg-white shadow-sm p-8">
           <div className="flex items-center justify-between">
             <div className="text-xs font-black tracking-widest text-zinc-400">DOSSIERS</div>
@@ -367,10 +338,11 @@ export default function ProPage() {
           <div className="mt-6 space-y-6">
             {projects.map((p) => {
               const t = normalizeType(p.project_type);
-              const statuses = STATUS_BY_TYPE[t] ?? STATUS_BY_TYPE.other;
-              const progress = clampPct(p.progress_percent ?? 0);
+              const stepsDef = STEPS_BY_TYPE[t] ?? STEPS_BY_TYPE.other;
+              const progress = clampPct(p.progress_percent);
 
               const canUpdate = p.owner_user_id === userId;
+              const isBusy = updatingProjectId === p.id;
 
               return (
                 <div key={p.id} className="rounded-3xl border border-zinc-200 bg-white p-6">
@@ -413,23 +385,20 @@ export default function ProPage() {
                     </div>
                   </div>
 
-                  {/* BOUTONS STATUTS (= étapes) */}
+                  {/* ✅ Boutons = étapes (1..N) */}
                   <div className="mt-5 flex flex-wrap gap-2">
-                    {statuses.map((s) => {
-                      const isActive = (p.status_text ?? "") === s.label;
-                      const isBusy = updatingProjectId === p.id;
+                    {stepsDef.map((s, idx) => {
+                      const stepIndex = idx + 1;
 
                       return (
                         <button
                           key={`${p.id}-${s.label}`}
-                          onClick={() => setProjectStatus(p, s)}
-                          disabled={isBusy || !canUpdate}
+                          onClick={() => setProjectStep(p, stepIndex)}
+                          disabled={!canUpdate || isBusy}
                           className={`rounded-full px-4 py-2 text-xs font-black border transition ${
-                            isActive
-                              ? "bg-black text-white border-black"
-                              : "bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50"
-                          } ${(isBusy || !canUpdate) ? "opacity-50" : ""}`}
-                          title={`${s.percent}%`}
+                            "bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50"
+                          } ${(!canUpdate || isBusy) ? "opacity-50" : ""}`}
+                          title={`Étape ${stepIndex}`}
                         >
                           {s.label}
                         </button>
