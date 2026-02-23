@@ -8,12 +8,12 @@ type Project = {
   created_at: string | null;
   client_name: string;
   progress_percent: number | null;
-  status_text: string | null; // ✅ étape en cours (recalculée)
+  status_text: string | null; // étape en cours (1ère non complétée) ou "Terminé"
   access_token: string;
   broker_email: string | null;
   drive_folder_url: string | null;
   updated_at: string | null;
-  project_type: string | null; // "immo" | "of"
+  project_type: string | null; // "immo" | "of" | "other"
   owner_user_id: string | null;
 };
 
@@ -214,7 +214,6 @@ export default function ProPage() {
     await loadAll();
   };
 
-  // ✅ Supprimer dossier (steps puis project)
   const deleteDossier = async (project: Project) => {
     if (deletingProjectId) return;
     if (!userId) return alert("Utilisateur non chargé.");
@@ -227,7 +226,6 @@ export default function ProPage() {
 
     setDeletingProjectId(project.id);
 
-    // 1) supprimer steps
     const { error: delStepsErr } = await supabase
       .from("project_steps")
       .delete()
@@ -240,7 +238,6 @@ export default function ProPage() {
       return;
     }
 
-    // 2) supprimer project
     const { error: delProjErr } = await supabase
       .from("projects")
       .delete()
@@ -259,11 +256,7 @@ export default function ProPage() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        Chargement...
-      </div>
-    );
+    return <div className="min-h-screen flex items-center justify-center">Chargement...</div>;
   }
 
   return (
@@ -374,14 +367,23 @@ export default function ProPage() {
             {projects.map((p) => {
               const t = normalizeType(p.project_type);
               const stepsDef = STEPS_BY_TYPE[t] ?? STEPS_BY_TYPE.other;
-              const progress = clampPct(p.progress_percent);
 
+              const progress = clampPct(p.progress_percent);
               const canUpdate = p.owner_user_id === userId;
               const isBusy = updatingProjectId === p.id;
               const isDeleting = deletingProjectId === p.id;
 
-              // ✅ étape en cours = status_text (recalculée)
-              const currentStep = p.status_text ?? "—";
+              const statusText = (p.status_text ?? "").trim();
+
+              // ✅ Étape en cours : label exact si trouvé
+              const idxCurrent = stepsDef.findIndex((s) => s.label === statusText);
+              const isFinished = statusText.toLowerCase() === "terminé";
+
+              // logique visuelle:
+              // - si terminé => toutes complétées
+              // - sinon: étapes < idxCurrent = complétées, idxCurrent = en cours, > = à venir
+              const currentLabel =
+                isFinished ? "Terminé" : idxCurrent >= 0 ? stepsDef[idxCurrent]?.label : statusText || "—";
 
               return (
                 <div key={p.id} className="rounded-3xl border border-zinc-200 bg-white p-6">
@@ -394,13 +396,18 @@ export default function ProPage() {
                         </div>
 
                         <span className="inline-flex items-center rounded-full bg-zinc-100 px-3 py-1 text-xs font-black text-zinc-700">
-                          Étape en cours : {currentStep}
+                          Étape en cours : {currentLabel}
                         </span>
                       </div>
 
-                      <div className="mt-2 text-sm font-semibold text-zinc-600">
-                        Progression : {progress}%
-                      </div>
+                      <div className="mt-2 text-sm font-semibold text-zinc-600">Progression : {progress}%</div>
+
+                      {/* warning si status_text ne match pas le template */}
+                      {!isFinished && idxCurrent === -1 && statusText && (
+                        <div className="mt-1 text-xs font-semibold text-amber-600">
+                          Attention : status_text ne correspond à aucune étape du template ({statusText})
+                        </div>
+                      )}
 
                       {!canUpdate && (
                         <div className="mt-1 text-xs font-semibold text-red-600">
@@ -430,26 +437,41 @@ export default function ProPage() {
                         onClick={() => deleteDossier(p)}
                         disabled={!canUpdate || isDeleting}
                         className="rounded-2xl border border-red-200 bg-white px-4 py-2 text-sm font-black text-red-600 hover:bg-red-50 transition disabled:opacity-50"
-                        title="Supprimer le dossier"
                       >
                         {isDeleting ? "Suppression..." : "Supprimer"}
                       </button>
                     </div>
                   </div>
 
-                  {/* Boutons étapes */}
+                  {/* ✅ Boutons étapes colorés : terminé / en cours / à venir */}
                   <div className="mt-5 flex flex-wrap gap-2">
                     {stepsDef.map((s, idx) => {
-                      const stepIndex = idx + 1;
+                      const stepIndex1 = idx + 1;
+
+                      const completed =
+                        isFinished ? true : idxCurrent >= 0 ? idx < idxCurrent : false;
+
+                      const isCurrent =
+                        !isFinished && idxCurrent >= 0 && idx === idxCurrent;
+
+                      // styles
+                      const base =
+                        "rounded-full px-4 py-2 text-xs font-black border transition";
+                      const disabled = (!canUpdate || isBusy || isDeleting) ? "opacity-50" : "";
+
+                      const cls = isCurrent
+                        ? `${base} bg-black text-white border-black`
+                        : completed
+                          ? `${base} bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100`
+                          : `${base} bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50`;
+
                       return (
                         <button
                           key={`${p.id}-${s.label}`}
-                          onClick={() => setProjectStep(p, stepIndex)}
+                          onClick={() => setProjectStep(p, stepIndex1)}
                           disabled={!canUpdate || isBusy || isDeleting}
-                          className={`rounded-full px-4 py-2 text-xs font-black border transition
-                            bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50
-                            ${(!canUpdate || isBusy || isDeleting) ? "opacity-50" : ""}`}
-                          title={`Étape ${stepIndex}`}
+                          className={`${cls} ${disabled}`}
+                          title={`Étape ${stepIndex1}`}
                         >
                           {s.label}
                         </button>
