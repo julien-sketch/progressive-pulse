@@ -13,6 +13,7 @@ type Project = {
   broker_email: string;
   drive_folder_url: string | null;
   access_token: string;
+  project_type?: string | null; // ✅ AJOUT
 };
 
 type Step = {
@@ -20,6 +21,48 @@ type Step = {
   label: string;
   is_completed: boolean;
 };
+
+type StatusDef = { label: string; percent: number };
+
+const STATUS_BY_TYPE: Record<string, StatusDef[]> = {
+  immo: [
+    { label: "Mandat non confirmé", percent: 0 },
+    { label: "Mandat signé", percent: 10 },
+    { label: "Documents reçus", percent: 25 },
+    { label: "Dossier complet", percent: 35 },
+    { label: "Visites en cours", percent: 50 },
+    { label: "Offre acceptée", percent: 70 },
+    { label: "Compromis signé", percent: 80 },
+    { label: "Délai de rétractation", percent: 88 },
+    { label: "Acte signé", percent: 100 },
+  ],
+  of: [
+    { label: "Documents reçus", percent: 0 },
+    { label: "Dossier complet", percent: 25 },
+    { label: "Dépôt effectué auprès du fonds de formation", percent: 38 },
+    { label: "En attente de validation", percent: 50 },
+    { label: "Validé", percent: 80 },
+    { label: "Financement reçu", percent: 100 },
+  ],
+  other: [
+    { label: "Documents reçus", percent: 0 },
+    { label: "Dossier complet", percent: 50 },
+    { label: "Terminé", percent: 100 },
+  ],
+};
+
+function clampPct(n: number | null | undefined) {
+  const v = typeof n === "number" ? n : 0;
+  return Math.max(0, Math.min(100, Math.round(v)));
+}
+
+function normalizeType(t: string | null | undefined) {
+  const v = (t ?? "").toLowerCase().trim();
+  if (v === "immobilier") return "immo";
+  if (v === "formation") return "of";
+  if (v === "immo" || v === "of") return v;
+  return "other";
+}
 
 export default function ClientTrack({ token }: { token: string }) {
   const supabase = useMemo(() => getSupabaseBrowser(), []);
@@ -83,6 +126,34 @@ export default function ClientTrack({ token }: { token: string }) {
     run();
   }, [token]);
 
+  // ✅ Étapes affichées : si steps DB vides -> on dérive du status_text + type
+  const displaySteps: Step[] = useMemo(() => {
+    if (!project) return [];
+
+    // si steps existent, on les garde
+    if (steps && steps.length > 0) return steps;
+
+    const type = normalizeType(project.project_type);
+    const statuses = STATUS_BY_TYPE[type] ?? STATUS_BY_TYPE.other;
+
+    // index du statut courant
+    let currentIdx = statuses.findIndex((s) => s.label === (project.status_text ?? ""));
+    if (currentIdx < 0) {
+      // fallback : basé sur progress_percent
+      const p = clampPct(project.progress_percent);
+      currentIdx = statuses.reduce((best, s, idx) => (s.percent <= p ? idx : best), 0);
+    }
+
+    return statuses.map((s, idx) => ({
+      order_index: idx + 1,
+      label: s.label,
+      is_completed: idx <= currentIdx,
+    }));
+  }, [project, steps]);
+
+  const completedCount = displaySteps.filter((s) => s.is_completed).length;
+  const totalCount = displaySteps.length || 0;
+
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !project) return;
@@ -112,11 +183,7 @@ export default function ClientTrack({ token }: { token: string }) {
     setTimeout(() => setUploadSuccess(false), 5000);
   };
 
-  const lastUpdate =
-    project?.updated_at || project?.created_at || null;
-
-  const completedCount = steps.filter((s) => s.is_completed).length;
-  const totalCount = steps.length || 8;
+  const lastUpdate = project?.updated_at || project?.created_at || null;
 
   if (loading) {
     return (
@@ -142,6 +209,8 @@ export default function ClientTrack({ token }: { token: string }) {
     );
   }
 
+  const pct = clampPct(project.progress_percent);
+
   return (
     <div className="min-h-screen bg-[#F5F5F7] px-6 pb-12 pt-16 font-sans text-gray-900">
       <div className="mx-auto max-w-md">
@@ -166,25 +235,26 @@ export default function ClientTrack({ token }: { token: string }) {
           <div className="relative mb-4 h-5 w-full overflow-hidden rounded-full bg-gray-100 shadow-inner">
             <div
               className="h-full rounded-full bg-gradient-to-r from-blue-600 via-emerald-400 to-green-400 transition-all duration-700 ease-out"
-              style={{ width: `${project.progress_percent}%` }}
+              style={{ width: `${pct}%` }}
             />
           </div>
 
           <div className="flex justify-between px-1 text-[10px] font-black uppercase tracking-widest text-gray-400">
             <span>Début</span>
             <span className="text-blue-500">
-              {project.progress_percent}% ({completedCount}/{totalCount})
+              {pct}% ({completedCount}/{totalCount})
             </span>
             <span>Fin</span>
           </div>
 
-          {!!steps.length && (
+          {/* ✅ Toujours afficher les étapes dérivées */}
+          {!!displaySteps.length && (
             <div className="mt-10">
               <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.25em] text-gray-400">
                 Étapes
               </p>
               <div className="space-y-2">
-                {steps.map((s) => (
+                {displaySteps.map((s) => (
                   <div
                     key={s.order_index}
                     className={`flex items-center justify-between rounded-2xl border p-4 text-sm font-semibold ${
@@ -219,7 +289,9 @@ export default function ClientTrack({ token }: { token: string }) {
                 <FileUp size={20} />
               )}
 
-              <span>{uploading ? "Envoi..." : uploadSuccess ? "Document reçu !" : "Ajouter un document"}</span>
+              <span>
+                {uploading ? "Envoi..." : uploadSuccess ? "Document reçu !" : "Ajouter un document"}
+              </span>
 
               <input type="file" className="hidden" onChange={handleUpload} disabled={uploading} />
             </label>
