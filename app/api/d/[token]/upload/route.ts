@@ -1,6 +1,7 @@
 // app/api/d/[token]/upload/route.ts
 import "server-only";
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { sendEmail } from "@/lib/email";
 
@@ -57,9 +58,7 @@ function renderProNewDocEmail(args: {
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="x-apple-disable-message-reformatting" />
   <title>Nouveau document reçu</title>
-  <style>
-    @media (max-width:640px){ .container{padding:14px !important;} }
-  </style>
+  <style>@media (max-width:640px){ .container{padding:14px !important;} }</style>
 </head>
 <body style="margin:0;padding:0;background:#f8fafc;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;">
   <div style="width:100%;padding:22px 10px;">
@@ -106,8 +105,13 @@ Suivi client: ${clientFollowUrl}`;
   return { html, text };
 }
 
-export async function POST(req: Request, { params }: { params: { token: string } }) {
-  const token = String(params.token ?? "").trim();
+// ✅ Next.js 15: context.params est une Promise
+export async function POST(
+  req: NextRequest,
+  context: { params: Promise<{ token: string }> }
+) {
+  const { token: rawToken } = await context.params;
+  const token = String(rawToken ?? "").trim();
   if (!token) return NextResponse.json({ error: "Missing token" }, { status: 400 });
 
   const sb = getSupabaseAdmin();
@@ -149,20 +153,26 @@ export async function POST(req: Request, { params }: { params: { token: string }
     return NextResponse.json({ error: upErr.message }, { status: 400 });
   }
 
-  // 4) Génère lien signé de téléchargement
+  // 4) Lien signé
   const { data: signed, error: signErr } = await sb.storage
     .from(BUCKET)
     .createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
 
   if (signErr || !signed?.signedUrl) {
-    // upload OK mais pas de lien => on renvoie quand même OK
     return NextResponse.json(
-      { ok: true, bucket: BUCKET, path, signedUrl: null, emailSent: false, warning: "Upload ok but no signed url" },
+      {
+        ok: true,
+        bucket: BUCKET,
+        path,
+        signedUrl: null,
+        emailSent: false,
+        warning: "Upload ok but no signed url",
+      },
       { status: 200 }
     );
   }
 
-  // 5) Envoie email au pro si broker_email existe
+  // 5) Email au pro
   let emailSent = false;
   const proEmail = (project.broker_email ?? "").trim();
   if (proEmail) {
