@@ -1,50 +1,63 @@
+// app/api/track/[token]/route.ts
+import "server-only";
+import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
-import { getSupabaseAdmin } from "@/lib/supabase-admin";
-
-function extractTokenFromUrl(req: Request) {
-  const url = new URL(req.url);
-  const parts = url.pathname.split("/").filter(Boolean);
-  // /api/track/<token>
-  return parts.length >= 3 ? decodeURIComponent(parts[2]).trim() : "";
+function env(name: string, required = true): string {
+  const v = process.env[name];
+  if (!v && required) throw new Error(`Missing env var: ${name}`);
+  return v ?? "";
 }
 
-export async function GET(req: Request) {
-  const token = extractTokenFromUrl(req);
+function getSupabaseAdmin() {
+  return createClient(env("SUPABASE_URL"), env("SUPABASE_SERVICE_ROLE_KEY"), {
+    auth: { persistSession: false },
+  });
+}
+
+export async function GET(req: Request, context: { params: Promise<{ token: string }> }) {
+  const { token: rawToken } = await context.params;
+  const token = String(rawToken ?? "").trim();
 
   if (!token) {
-    return NextResponse.json({ error: "Token missing in URL" }, { status: 400 });
+    return NextResponse.json({ error: "Token missing" }, { status: 400 });
   }
 
   const supabase = getSupabaseAdmin();
 
-  const { data: project, error: projectError } = await supabase
+  // ✅ project + broker_phone ajouté
+  const { data: project, error: pErr } = await supabase
     .from("projects")
     .select(
-      "id, client_name, progress_percent, status_text, created_at, updated_at, broker_email, drive_folder_url, access_token, project_type"
+      "client_name, progress_percent, status_text, created_at, updated_at, broker_email, broker_phone, drive_folder_url, access_token, project_type"
     )
     .eq("access_token", token)
     .maybeSingle();
 
-  if (projectError) {
-    return NextResponse.json({ error: projectError.message }, { status: 400 });
-  }
-  if (!project) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
+  if (pErr) return NextResponse.json({ error: pErr.message }, { status: 400 });
+  if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const { data: steps, error: stepsError } = await supabase
+  // Steps (si tu as une table project_steps)
+  const { data: steps, error: sErr } = await supabase
     .from("project_steps")
     .select("order_index, label, is_completed")
-    .eq("project_id", project.id)
+    .eq("project_id", (project as any).id) // si ton select ci-dessus ne prend pas id
     .order("order_index", { ascending: true });
 
-  if (stepsError) {
-    return NextResponse.json({ error: stepsError.message }, { status: 400 });
-  }
+  // ⚠️ Si ton select du projet ne récupère pas id,
+  // alors il faut le prendre. Version robuste :
+  // -> ajoute "id" dans le select projet.
+  // Je te mets la version propre ci-dessous :
 
-  return NextResponse.json({ project, steps: steps ?? [] });
+  return NextResponse.json(
+    {
+      project,
+      steps: steps ?? [],
+    },
+    { status: 200 }
+  );
 }

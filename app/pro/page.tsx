@@ -8,12 +8,13 @@ type Project = {
   created_at: string | null;
   client_name: string;
   progress_percent: number | null;
-  status_text: string | null; // étape en cours (1ère non complétée) ou "Terminé"
+  status_text: string | null;
   access_token: string;
   broker_email: string | null;
+  broker_phone: string | null; // ✅ AJOUT
   drive_folder_url: string | null;
   updated_at: string | null;
-  project_type: string | null; // "immo" | "of" | "other"
+  project_type: string | null;
   owner_user_id: string | null;
 };
 
@@ -87,6 +88,10 @@ export default function ProPage() {
   const [updatingProjectId, setUpdatingProjectId] = useState<string | null>(null);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
 
+  // ✅ édition téléphone par dossier
+  const [phoneDraftById, setPhoneDraftById] = useState<Record<string, string>>({});
+  const [savingPhoneId, setSavingPhoneId] = useState<string | null>(null);
+
   const stripeCheckoutUrl = `https://buy.stripe.com/eVq8wQ3kJ7vWc2x58veIw00?prefilled_email=${encodeURIComponent(
     userEmail || ""
   )}`;
@@ -125,10 +130,11 @@ export default function ProPage() {
       setCredits(Number(walletRow?.credits ?? 0));
     }
 
+    // ✅ IMPORTANT: on inclut broker_phone
     const { data: projectsData, error: projectsErr } = await supabase
       .from("projects")
       .select(
-        "id,created_at,client_name,progress_percent,status_text,access_token,broker_email,drive_folder_url,updated_at,project_type,owner_user_id"
+        "id,created_at,client_name,progress_percent,status_text,access_token,broker_email,broker_phone,drive_folder_url,updated_at,project_type,owner_user_id"
       )
       .eq("broker_email", email)
       .order("created_at", { ascending: false });
@@ -140,7 +146,18 @@ export default function ProPage() {
       return;
     }
 
-    setProjects((projectsData ?? []) as Project[]);
+    const rows = (projectsData ?? []) as Project[];
+    setProjects(rows);
+
+    // ✅ initialise les drafts téléphone depuis la DB
+    setPhoneDraftById((prev) => {
+      const next = { ...prev };
+      for (const p of rows) {
+        if (next[p.id] === undefined) next[p.id] = (p.broker_phone ?? "").toString();
+      }
+      return next;
+    });
+
     setLoading(false);
   };
 
@@ -211,6 +228,32 @@ export default function ProPage() {
     }
 
     setUpdatingProjectId(null);
+    await loadAll();
+  };
+
+  // ✅ Sauvegarde téléphone (par dossier)
+  const savePhone = async (project: Project) => {
+    if (savingPhoneId) return;
+    if (!userEmail) return alert("Email utilisateur non chargé.");
+
+    const draft = (phoneDraftById[project.id] ?? "").trim();
+
+    setSavingPhoneId(project.id);
+
+    const { error } = await supabase
+      .from("projects")
+      .update({ broker_phone: draft || null })
+      .eq("id", project.id)
+      .eq("broker_email", userEmail); // sécurité: tu ne modifies que tes dossiers
+
+    if (error) {
+      console.error("update broker_phone error:", error);
+      alert(error.message);
+      setSavingPhoneId(null);
+      return;
+    }
+
+    setSavingPhoneId(null);
     await loadAll();
   };
 
@@ -374,16 +417,13 @@ export default function ProPage() {
               const isDeleting = deletingProjectId === p.id;
 
               const statusText = (p.status_text ?? "").trim();
-
-              // ✅ Étape en cours : label exact si trouvé
               const idxCurrent = stepsDef.findIndex((s) => s.label === statusText);
               const isFinished = statusText.toLowerCase() === "terminé";
 
-              // logique visuelle:
-              // - si terminé => toutes complétées
-              // - sinon: étapes < idxCurrent = complétées, idxCurrent = en cours, > = à venir
               const currentLabel =
                 isFinished ? "Terminé" : idxCurrent >= 0 ? stepsDef[idxCurrent]?.label : statusText || "—";
+
+              const phoneDraft = phoneDraftById[p.id] ?? (p.broker_phone ?? "");
 
               return (
                 <div key={p.id} className="rounded-3xl border border-zinc-200 bg-white p-6">
@@ -391,18 +431,17 @@ export default function ProPage() {
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <div className="text-xl font-black">{p.client_name}</div>
-                        <div className="text-xs font-black tracking-widest text-zinc-400">
-                          • {t.toUpperCase()}
-                        </div>
+                        <div className="text-xs font-black tracking-widest text-zinc-400">• {t.toUpperCase()}</div>
 
                         <span className="inline-flex items-center rounded-full bg-zinc-100 px-3 py-1 text-xs font-black text-zinc-700">
                           Étape en cours : {currentLabel}
                         </span>
                       </div>
 
-                      <div className="mt-2 text-sm font-semibold text-zinc-600">Progression : {progress}%</div>
+                      <div className="mt-2 text-sm font-semibold text-zinc-600">
+                        Progression : {progress}%
+                      </div>
 
-                      {/* warning si status_text ne match pas le template */}
                       {!isFinished && idxCurrent === -1 && statusText && (
                         <div className="mt-1 text-xs font-semibold text-amber-600">
                           Attention : status_text ne correspond à aucune étape du template ({statusText})
@@ -414,6 +453,35 @@ export default function ProPage() {
                           owner_user_id manquant ou différent : actions bloquées.
                         </div>
                       )}
+
+                      {/* ✅ CONTACT PRO: téléphone éditable */}
+                      <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="md:col-span-2">
+                          <div className="text-xs font-black tracking-widest text-zinc-400">TÉLÉPHONE PRO</div>
+                          <input
+                            value={phoneDraft}
+                            onChange={(e) =>
+                              setPhoneDraftById((prev) => ({ ...prev, [p.id]: e.target.value }))
+                            }
+                            placeholder="ex: 06 12 34 56 78"
+                            className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 font-semibold outline-none focus:ring-2 focus:ring-black/10"
+                          />
+                          <div className="mt-1 text-xs text-zinc-500 font-semibold">
+                            Ce numéro apparaîtra côté client (bouton “Appeler mon agent”).
+                          </div>
+                        </div>
+
+                        <div className="md:col-span-1 flex md:items-end">
+                          <button
+                            onClick={() => savePhone(p)}
+                            disabled={!canUpdate || isDeleting || savingPhoneId === p.id}
+                            className="w-full rounded-2xl bg-black text-white px-4 py-3 text-sm font-black hover:bg-zinc-800 transition disabled:opacity-50"
+                            title={!canUpdate ? "Action bloquée (owner_user_id)" : ""}
+                          >
+                            {savingPhoneId === p.id ? "Sauvegarde..." : "Enregistrer"}
+                          </button>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="flex items-center gap-3">
@@ -443,27 +511,22 @@ export default function ProPage() {
                     </div>
                   </div>
 
-                  {/* ✅ Boutons étapes colorés : terminé / en cours / à venir */}
+                  {/* ✅ Boutons étapes */}
                   <div className="mt-5 flex flex-wrap gap-2">
                     {stepsDef.map((s, idx) => {
                       const stepIndex1 = idx + 1;
 
-                      const completed =
-                        isFinished ? true : idxCurrent >= 0 ? idx < idxCurrent : false;
+                      const completed = isFinished ? true : idxCurrent >= 0 ? idx < idxCurrent : false;
+                      const isCurrent = !isFinished && idxCurrent >= 0 && idx === idxCurrent;
 
-                      const isCurrent =
-                        !isFinished && idxCurrent >= 0 && idx === idxCurrent;
-
-                      // styles
-                      const base =
-                        "rounded-full px-4 py-2 text-xs font-black border transition";
-                      const disabled = (!canUpdate || isBusy || isDeleting) ? "opacity-50" : "";
+                      const base = "rounded-full px-4 py-2 text-xs font-black border transition";
+                      const disabled = !canUpdate || isBusy || isDeleting ? "opacity-50" : "";
 
                       const cls = isCurrent
                         ? `${base} bg-black text-white border-black`
                         : completed
-                          ? `${base} bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100`
-                          : `${base} bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50`;
+                        ? `${base} bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100`
+                        : `${base} bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50`;
 
                       return (
                         <button
@@ -482,9 +545,7 @@ export default function ProPage() {
               );
             })}
 
-            {projects.length === 0 && (
-              <div className="text-sm text-zinc-500">Aucun dossier pour le moment.</div>
-            )}
+            {projects.length === 0 && <div className="text-sm text-zinc-500">Aucun dossier pour le moment.</div>}
           </div>
         </div>
       </div>

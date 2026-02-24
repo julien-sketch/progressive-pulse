@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
-import { FileUp, MessageCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { FileUp, MessageCircle, CheckCircle2, Loader2, Phone } from "lucide-react";
 
 type Project = {
   client_name: string;
@@ -11,6 +11,7 @@ type Project = {
   created_at: string | null;
   updated_at: string | null;
   broker_email: string;
+  broker_phone: string | null; // ✅ AJOUT
   drive_folder_url: string | null;
   access_token: string;
   project_type?: string | null;
@@ -64,10 +65,14 @@ function normalizeType(t: string | null | undefined) {
   return "other";
 }
 
+function normalizePhone(phone: string) {
+  // garde chiffres + le +
+  return phone.replace(/[^\d+]/g, "");
+}
+
 export default function ClientTrack({ token }: { token: string }) {
-  // note: tu l'utilises peut-être ailleurs pour du read, je le laisse
   const supabase = useMemo(() => getSupabaseBrowser(), []);
-  void supabase; // évite l’avertissement si non utilisé
+  void supabase;
 
   const [project, setProject] = useState<Project | null>(null);
   const [steps, setSteps] = useState<Step[]>([]);
@@ -130,7 +135,6 @@ export default function ClientTrack({ token }: { token: string }) {
 
   const displaySteps: Step[] = useMemo(() => {
     if (!project) return [];
-
     if (steps && steps.length > 0) return steps;
 
     const type = normalizeType(project.project_type);
@@ -163,17 +167,13 @@ export default function ClientTrack({ token }: { token: string }) {
       const fd = new FormData();
       fd.append("file", file);
 
-      // IMPORTANT: on passe par la route serveur (pas d’upload direct Supabase côté client)
       const res = await fetch(`/api/d/${encodeURIComponent(project.access_token)}/upload`, {
         method: "POST",
         body: fd,
       });
 
       const json = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        throw new Error(json?.error ?? "Upload failed");
-      }
+      if (!res.ok) throw new Error(json?.error ?? "Upload failed");
 
       setUploadSuccess(true);
       setTimeout(() => setUploadSuccess(false), 5000);
@@ -182,7 +182,6 @@ export default function ClientTrack({ token }: { token: string }) {
       alert(err?.message ?? "Erreur lors de l'envoi");
     } finally {
       setUploading(false);
-      // permet de renvoyer le même fichier ensuite
       e.target.value = "";
     }
   };
@@ -212,6 +211,8 @@ export default function ClientTrack({ token }: { token: string }) {
   }
 
   const pct = clampPct(project.progress_percent);
+  const phone = (project.broker_phone ?? "").trim();
+  const phoneHref = phone ? `tel:${encodeURIComponent(normalizePhone(phone))}` : null;
 
   return (
     <div className="min-h-screen bg-[#F5F5F7] px-6 pb-12 pt-16 font-sans text-gray-900">
@@ -227,8 +228,7 @@ export default function ClientTrack({ token }: { token: string }) {
               {project.status_text}
             </h2>
             <p className="mt-2 text-sm font-medium text-gray-400">
-              Dernière mise à jour :{" "}
-              {lastUpdate ? new Date(lastUpdate).toLocaleDateString("fr-FR") : "-"}
+              Dernière mise à jour : {lastUpdate ? new Date(lastUpdate).toLocaleDateString("fr-FR") : "-"}
             </p>
           </div>
 
@@ -293,6 +293,18 @@ export default function ClientTrack({ token }: { token: string }) {
               <input type="file" className="hidden" onChange={handleUpload} disabled={uploading} />
             </label>
 
+            {/* ✅ Bouton téléphone (affiché seulement si le pro a renseigné un numéro) */}
+            {phoneHref && (
+              <a
+                href={phoneHref}
+                className="flex w-full items-center justify-center gap-3 rounded-2xl border border-gray-200 bg-white p-4 font-bold text-gray-700 transition-all hover:bg-gray-50 active:scale-95"
+              >
+                <Phone size={20} />
+                Appeler mon agent
+              </a>
+            )}
+
+            {/* Email (déjà existant) */}
             <a
               href={`mailto:${project.broker_email}?subject=${encodeURIComponent(
                 `Question sur mon dossier ${project.client_name}`
