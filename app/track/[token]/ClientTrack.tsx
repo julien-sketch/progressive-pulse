@@ -13,7 +13,7 @@ type Project = {
   broker_email: string;
   drive_folder_url: string | null;
   access_token: string;
-  project_type?: string | null; // ✅ AJOUT
+  project_type?: string | null;
 };
 
 type Step = {
@@ -65,7 +65,9 @@ function normalizeType(t: string | null | undefined) {
 }
 
 export default function ClientTrack({ token }: { token: string }) {
+  // note: tu l'utilises peut-être ailleurs pour du read, je le laisse
   const supabase = useMemo(() => getSupabaseBrowser(), []);
+  void supabase; // évite l’avertissement si non utilisé
 
   const [project, setProject] = useState<Project | null>(null);
   const [steps, setSteps] = useState<Step[]>([]);
@@ -126,20 +128,16 @@ export default function ClientTrack({ token }: { token: string }) {
     run();
   }, [token]);
 
-  // ✅ Étapes affichées : si steps DB vides -> on dérive du status_text + type
   const displaySteps: Step[] = useMemo(() => {
     if (!project) return [];
 
-    // si steps existent, on les garde
     if (steps && steps.length > 0) return steps;
 
     const type = normalizeType(project.project_type);
     const statuses = STATUS_BY_TYPE[type] ?? STATUS_BY_TYPE.other;
 
-    // index du statut courant
     let currentIdx = statuses.findIndex((s) => s.label === (project.status_text ?? ""));
     if (currentIdx < 0) {
-      // fallback : basé sur progress_percent
       const p = clampPct(project.progress_percent);
       currentIdx = statuses.reduce((best, s, idx) => (s.percent <= p ? idx : best), 0);
     }
@@ -161,26 +159,32 @@ export default function ClientTrack({ token }: { token: string }) {
     setUploading(true);
     setUploadSuccess(false);
 
-    const fileExt = file.name.split(".").pop() || "bin";
-    const safeToken = String(project.access_token || "dossier")
-      .trim()
-      .replace(/[\/\\?#%*:|"<>]/g, "-");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
 
-    const fileName = `${safeToken}/${Date.now()}.${fileExt}`;
+      // IMPORTANT: on passe par la route serveur (pas d’upload direct Supabase côté client)
+      const res = await fetch(`/api/d/${encodeURIComponent(project.access_token)}/upload`, {
+        method: "POST",
+        body: fd,
+      });
 
-    const { error } = await supabase.storage
-      .from("client-documents")
-      .upload(fileName, file, { upsert: false });
+      const json = await res.json().catch(() => ({}));
 
-    setUploading(false);
+      if (!res.ok) {
+        throw new Error(json?.error ?? "Upload failed");
+      }
 
-    if (error) {
-      alert("Erreur lors de l'envoi : " + error.message);
-      return;
+      setUploadSuccess(true);
+      setTimeout(() => setUploadSuccess(false), 5000);
+    } catch (err: any) {
+      console.error("Upload error:", err);
+      alert(err?.message ?? "Erreur lors de l'envoi");
+    } finally {
+      setUploading(false);
+      // permet de renvoyer le même fichier ensuite
+      e.target.value = "";
     }
-
-    setUploadSuccess(true);
-    setTimeout(() => setUploadSuccess(false), 5000);
   };
 
   const lastUpdate = project?.updated_at || project?.created_at || null;
@@ -189,9 +193,7 @@ export default function ClientTrack({ token }: { token: string }) {
     return (
       <div className="flex h-screen flex-col items-center justify-center bg-[#F5F5F7] px-6">
         <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-        <p className="mt-4 text-sm font-medium text-gray-500">
-          Récupération de votre dossier...
-        </p>
+        <p className="mt-4 text-sm font-medium text-gray-500">Récupération de votre dossier...</p>
       </div>
     );
   }
@@ -216,9 +218,7 @@ export default function ClientTrack({ token }: { token: string }) {
       <div className="mx-auto max-w-md">
         <header className="mb-12 text-center">
           <h1 className="text-3xl font-bold tracking-tight text-black">Pro-Pulse</h1>
-          <p className="mt-2 font-medium text-gray-500">
-            Suivi de dossier • {project.client_name}
-          </p>
+          <p className="mt-2 font-medium text-gray-500">Suivi de dossier • {project.client_name}</p>
         </header>
 
         <main className="relative overflow-hidden rounded-[2.5rem] border border-white/40 bg-white/80 p-8 shadow-2xl shadow-gray-200/50 backdrop-blur-2xl">
@@ -247,7 +247,6 @@ export default function ClientTrack({ token }: { token: string }) {
             <span>Fin</span>
           </div>
 
-          {/* ✅ Toujours afficher les étapes dérivées */}
           {!!displaySteps.length && (
             <div className="mt-10">
               <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.25em] text-gray-400">
@@ -289,9 +288,7 @@ export default function ClientTrack({ token }: { token: string }) {
                 <FileUp size={20} />
               )}
 
-              <span>
-                {uploading ? "Envoi..." : uploadSuccess ? "Document reçu !" : "Ajouter un document"}
-              </span>
+              <span>{uploading ? "Envoi..." : uploadSuccess ? "Document reçu !" : "Ajouter un document"}</span>
 
               <input type="file" className="hidden" onChange={handleUpload} disabled={uploading} />
             </label>
