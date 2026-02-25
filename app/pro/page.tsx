@@ -5,10 +5,11 @@ import { getSupabaseBrowser } from "@/lib/supabase-browser";
 
 type Profile = {
   user_id: string;
+  email: string | null;
   first_name: string | null;
   last_name: string | null;
   phone: string | null;
-  profession: string;
+  profession: string | null;
 };
 
 type Project = {
@@ -60,14 +61,42 @@ const STEPS_BY_TYPE: Record<string, StepDef[]> = {
     { label: "Signature" },
     { label: "Déblocage fonds" },
   ],
-  artisan: [{ label: "Demande reçue" }, { label: "Devis" }, { label: "Planification" }, { label: "Terminé" }],
-  freelance: [{ label: "Demande reçue" }, { label: "Devis" }, { label: "En cours" }, { label: "Livré" }],
+  artisan: [
+    { label: "Demande reçue" },
+    { label: "Devis envoyé" },
+    { label: "Planification" },
+    { label: "Terminé" },
+  ],
+  freelance: [
+    { label: "Demande reçue" },
+    { label: "Devis validé" },
+    { label: "En cours" },
+    { label: "Livré" },
+  ],
   other: [{ label: "Documents reçus" }, { label: "Dossier complet" }, { label: "Terminé" }],
 };
+
+const PROFESSION_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: "courtier", label: "Courtier" },
+  { value: "immo", label: "Agent immobilier" },
+  { value: "of", label: "Organisme de formation" },
+  { value: "artisan", label: "Artisan" },
+  { value: "freelance", label: "Freelance" },
+  { value: "other", label: "Autre" },
+];
 
 function clampPct(n: number | null | undefined) {
   const v = typeof n === "number" ? n : 0;
   return Math.max(0, Math.min(100, Math.round(v)));
+}
+
+function normalizeType(t: string | null | undefined) {
+  const v = (t ?? "").toLowerCase().trim();
+  if (v === "immobilier") return "immo";
+  if (v === "formation") return "of";
+  if (v === "immo" || v === "of") return v;
+  if (v === "courtier" || v === "artisan" || v === "freelance") return v;
+  return "other";
 }
 
 function makeAccessToken(clientName: string) {
@@ -87,24 +116,28 @@ export default function ProPage() {
   const supabase = useMemo(() => getSupabaseBrowser(), []);
 
   const [loading, setLoading] = useState(true);
+
   const [userId, setUserId] = useState<string>("");
   const [userEmail, setUserEmail] = useState<string>("");
-
-  const [profile, setProfile] = useState<Profile | null>(null);
 
   const [credits, setCredits] = useState<number>(0);
   const [projects, setProjects] = useState<Project[]>([]);
 
-  // create
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+
+  // Draft profil
+  const [professionDraft, setProfessionDraft] = useState<string>("other");
+  const [phoneDraft, setPhoneDraft] = useState<string>("");
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  // create dossier
   const [clientName, setClientName] = useState<string>("");
-  const [projectTitle, setProjectTitle] = useState<string>(""); // ✅ optionnel
+  const [projectTitle, setProjectTitle] = useState<string>(""); // facultatif
   const [creating, setCreating] = useState(false);
 
   const [updatingProjectId, setUpdatingProjectId] = useState<string | null>(null);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
-
-  const [phoneDraftById, setPhoneDraftById] = useState<Record<string, string>>({});
-  const [savingPhoneId, setSavingPhoneId] = useState<string | null>(null);
 
   const stripeCheckoutUrl = `https://buy.stripe.com/eVq8wQ3kJ7vWc2x58veIw00?prefilled_email=${encodeURIComponent(
     userEmail || ""
@@ -131,21 +164,7 @@ export default function ProPage() {
     setUserId(uid);
     setUserEmail(email);
 
-    // profile
-    const { data: prof, error: profErr } = await supabase
-      .from("profiles")
-      .select("user_id, first_name, last_name, phone, profession")
-      .eq("user_id", uid)
-      .maybeSingle();
-
-    if (profErr) {
-      console.error("profiles:", profErr);
-      setProfile(null);
-    } else {
-      setProfile((prof ?? null) as any);
-    }
-
-    // wallet
+    // credits
     const { data: walletRow, error: walletErr } = await supabase
       .from("credit_wallets")
       .select("credits")
@@ -159,13 +178,33 @@ export default function ProPage() {
       setCredits(Number(walletRow?.credits ?? 0));
     }
 
-    // projects: filtre solide par owner_user_id
+    // profile
+    setProfileLoading(true);
+    const { data: prof, error: profErr } = await supabase
+      .from("profiles")
+      .select("user_id,email,first_name,last_name,phone,profession")
+      .eq("user_id", uid)
+      .maybeSingle();
+
+    setProfileLoading(false);
+
+    if (profErr) {
+      console.error("profiles:", profErr);
+      setProfile(null);
+    } else {
+      const p = (prof ?? null) as Profile | null;
+      setProfile(p);
+      setProfessionDraft(normalizeType(p?.profession));
+      setPhoneDraft((p?.phone ?? "").toString());
+    }
+
+    // projects
     const { data: projectsData, error: projectsErr } = await supabase
       .from("projects")
       .select(
         "id,created_at,client_name,project_title,progress_percent,status_text,access_token,broker_email,broker_phone,drive_folder_url,updated_at,project_type,owner_user_id"
       )
-      .eq("owner_user_id", uid)
+      .eq("owner_user_id", uid) // ✅ on arrête le filtre email, on utilise owner_user_id
       .order("created_at", { ascending: false });
 
     if (projectsErr) {
@@ -175,17 +214,7 @@ export default function ProPage() {
       return;
     }
 
-    const rows = (projectsData ?? []) as Project[];
-    setProjects(rows);
-
-    setPhoneDraftById((prev) => {
-      const next = { ...prev };
-      for (const p of rows) {
-        if (next[p.id] === undefined) next[p.id] = (p.broker_phone ?? "").toString();
-      }
-      return next;
-    });
-
+    setProjects((projectsData ?? []) as Project[]);
     setLoading(false);
   };
 
@@ -209,68 +238,74 @@ export default function ProPage() {
     }
   };
 
+  const profileOk =
+    !!profile &&
+    normalizeType(profile.profession) !== "other" && // tu peux enlever ça si tu acceptes "other"
+    !!(profile.phone && profile.phone.trim().length >= 6);
+
+  const saveProfile = async () => {
+    if (!userId) return;
+    const phone = phoneDraft.trim();
+    const prof = normalizeType(professionDraft);
+
+    if (!phone || phone.length < 6) return alert("Téléphone invalide.");
+    if (!prof) return alert("Métier invalide.");
+
+    setSavingProfile(true);
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        phone,
+        profession: prof,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", userId);
+
+    setSavingProfile(false);
+
+    if (error) {
+      console.error("saveProfile:", error);
+      alert(error.message);
+      return;
+    }
+
+    await loadAll();
+  };
+
   const createDossier = async () => {
     if (creating) return;
+    if (!profileOk) return alert("Profil incomplet : renseigne métier + téléphone.");
 
     const name = clientName.trim();
-    const title = projectTitle.trim();
-
     if (!name) return alert("Renseigne le nom du client.");
-    if (!userId || !userEmail) return alert("Utilisateur non chargé.");
-
-    // ✅ profil obligatoire
-    if (!profile?.profession) return alert("Profil incomplet : choisis ton métier.");
-    if (!profile?.phone) return alert("Profil incomplet : renseigne ton téléphone.");
 
     setCreating(true);
 
     const accessToken = makeAccessToken(name);
-    const projectType = profile.profession;
 
-    // RPC existant (on garde ton système crédits)
+    // ✅ Nouvelle signature de la RPC
     const { error } = await supabase.rpc("create_project_with_credit", {
       p_client_name: name,
-      p_project_type: projectType,
       p_access_token: accessToken,
+      p_project_title: projectTitle.trim() || null,
     });
+
+    setCreating(false);
 
     if (error) {
       console.error("RPC create_project_with_credit error:", error);
       alert(error.message);
-      setCreating(false);
       return;
-    }
-
-    // ✅ Post-update: project_title + broker_phone (copie depuis profil)
-    // On retrouve le projet via access_token (unique côté usage)
-    const { data: created, error: findErr } = await supabase
-      .from("projects")
-      .select("id")
-      .eq("access_token", accessToken)
-      .maybeSingle();
-
-    if (!findErr && created?.id) {
-      await supabase
-        .from("projects")
-        .update({
-          project_title: title || null,
-          broker_phone: profile.phone || null,
-          broker_email: userEmail,
-          owner_user_id: userId,
-        })
-        .eq("id", created.id);
     }
 
     setClientName("");
     setProjectTitle("");
-    setCreating(false);
     await loadAll();
   };
 
   const setProjectStep = async (project: Project, stepIndex1Based: number) => {
     if (updatingProjectId) return;
-    if (!userId) return alert("Utilisateur non chargé.");
-
     setUpdatingProjectId(project.id);
 
     const { error } = await supabase.rpc("set_project_step", {
@@ -278,42 +313,20 @@ export default function ProPage() {
       p_step_index: stepIndex1Based,
     });
 
+    setUpdatingProjectId(null);
+
     if (error) {
       console.error("set_project_step error:", error);
       alert(error.message);
-    }
-
-    setUpdatingProjectId(null);
-    await loadAll();
-  };
-
-  const savePhone = async (project: Project) => {
-    if (savingPhoneId) return;
-
-    const draft = (phoneDraftById[project.id] ?? "").trim();
-    setSavingPhoneId(project.id);
-
-    const { error } = await supabase
-      .from("projects")
-      .update({ broker_phone: draft || null })
-      .eq("id", project.id)
-      .eq("owner_user_id", userId);
-
-    if (error) {
-      console.error("update broker_phone error:", error);
-      alert(error.message);
-      setSavingPhoneId(null);
       return;
     }
 
-    setSavingPhoneId(null);
     await loadAll();
   };
 
   const deleteDossier = async (project: Project) => {
     if (deletingProjectId) return;
-    if (!userId) return alert("Utilisateur non chargé.");
-    if (project.owner_user_id !== userId) return alert("Suppression refusée.");
+    if (project.owner_user_id !== userId) return alert("Suppression refusée (owner_user_id).");
 
     const ok = confirm(
       `Supprimer définitivement le dossier "${project.client_name}" ?\n\nCette action est irréversible.`
@@ -355,7 +368,9 @@ export default function ProPage() {
     return <div className="min-h-screen flex items-center justify-center">Chargement...</div>;
   }
 
-  const professionKey = profile?.profession || "other";
+  const metierLabel =
+    PROFESSION_OPTIONS.find((o) => o.value === normalizeType(profile?.profession))?.label ??
+    normalizeType(profile?.profession);
 
   return (
     <div className="min-h-screen bg-white px-6 py-8">
@@ -365,11 +380,10 @@ export default function ProPage() {
           <div>
             <h1 className="text-4xl font-black tracking-tight">Dashboard Pro</h1>
             <p className="text-sm text-zinc-500 mt-1">Connecté : {userEmail}</p>
-            {profile && (
-              <p className="text-xs font-bold text-zinc-400 mt-1">
-                Métier : {profile.profession} • Téléphone : {profile.phone || "—"}
-              </p>
-            )}
+            <p className="text-sm text-zinc-500 mt-1">
+              Métier : {profileLoading ? "…" : metierLabel || "—"} • Téléphone :{" "}
+              {profileLoading ? "…" : profile?.phone || "—"}
+            </p>
           </div>
 
           <button
@@ -391,7 +405,9 @@ export default function ProPage() {
               <div className="pb-2 text-zinc-600 font-semibold">dossiers restants</div>
             </div>
 
-            <p className="mt-3 text-sm text-zinc-500 font-semibold">1 dossier créé = 1 crédit consommé.</p>
+            <p className="mt-3 text-sm text-zinc-500 font-semibold">
+              1 dossier créé = 1 crédit consommé.
+            </p>
 
             <div className="mt-6 flex items-center gap-3">
               <a
@@ -412,19 +428,56 @@ export default function ProPage() {
             </div>
           </div>
 
-          {/* CREATE DOSSIER */}
+          {/* PROFIL + CREATE */}
           <div className="rounded-3xl border border-zinc-200 bg-white shadow-sm p-8">
-            <div className="text-xs font-black tracking-widest text-zinc-400">CRÉER UN DOSSIER</div>
+            <div className="text-xs font-black tracking-widest text-zinc-400">PROFIL & CRÉATION</div>
 
-            {!profile?.profession || !profile?.phone ? (
-              <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900 font-bold">
+            {/* ✅ Pas d'overlay plein écran : juste un bloc d'alerte */}
+            {!profileOk && (
+              <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900 font-bold">
                 Profil incomplet : métier et téléphone obligatoires.
-                <div className="mt-2 text-sm font-semibold">
-                  Va sur la page d’inscription ou complète ton profil dans Supabase (temporaire).
-                </div>
               </div>
-            ) : (
-              <div className="mt-6 space-y-4">
+            )}
+
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <div className="text-xs font-black tracking-widest text-zinc-400">MÉTIER</div>
+                <select
+                  value={professionDraft}
+                  onChange={(e) => setProfessionDraft(e.target.value)}
+                  className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 font-semibold outline-none focus:ring-2 focus:ring-black/10"
+                >
+                  {PROFESSION_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <div className="text-xs font-black tracking-widest text-zinc-400">TÉLÉPHONE</div>
+                <input
+                  value={phoneDraft}
+                  onChange={(e) => setPhoneDraft(e.target.value)}
+                  placeholder="ex: 06 12 34 56 78"
+                  className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 font-semibold outline-none focus:ring-2 focus:ring-black/10"
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={saveProfile}
+              disabled={savingProfile}
+              className="mt-4 w-full rounded-2xl bg-black text-white px-6 py-3 font-black hover:bg-zinc-800 transition disabled:opacity-50"
+            >
+              {savingProfile ? "Sauvegarde..." : "Enregistrer mon profil"}
+            </button>
+
+            <div className="mt-8 border-t border-zinc-100 pt-6">
+              <div className="text-xs font-black tracking-widest text-zinc-400">CRÉER UN DOSSIER</div>
+
+              <div className="mt-4 space-y-4">
                 <div>
                   <div className="text-xs font-black tracking-widest text-zinc-400">CLIENT</div>
                   <input
@@ -436,7 +489,7 @@ export default function ProPage() {
                 </div>
 
                 <div>
-                  <div className="text-xs font-black tracking-widest text-zinc-400">NOM DU DOSSIER (OPTIONNEL)</div>
+                  <div className="text-xs font-black tracking-widest text-zinc-400">NOM DU DOSSIER (FACULTATIF)</div>
                   <input
                     value={projectTitle}
                     onChange={(e) => setProjectTitle(e.target.value)}
@@ -445,25 +498,16 @@ export default function ProPage() {
                   />
                 </div>
 
-                <div className="text-xs font-semibold text-zinc-500">
-                  Template automatique : <b>{professionKey}</b> (défini par ton profil).
-                </div>
-
                 <button
                   onClick={createDossier}
-                  disabled={creating}
+                  disabled={creating || !profileOk}
                   className="mt-2 w-full rounded-2xl bg-black text-white px-6 py-4 font-black hover:bg-zinc-800 transition disabled:opacity-40"
+                  title={!profileOk ? "Complète ton profil d'abord" : ""}
                 >
                   {creating ? "Création..." : "Créer (1 crédit)"}
                 </button>
-
-                {credits <= 0 && (
-                  <div className="text-xs font-semibold text-zinc-500">
-                    Plus de crédits : utilise “Acheter des dossiers”.
-                  </div>
-                )}
               </div>
-            )}
+            </div>
           </div>
         </div>
 
@@ -476,7 +520,7 @@ export default function ProPage() {
 
           <div className="mt-6 space-y-6">
             {projects.map((p) => {
-              const t = (p.project_type ?? professionKey) as string;
+              const t = normalizeType(p.project_type);
               const stepsDef = STEPS_BY_TYPE[t] ?? STEPS_BY_TYPE.other;
 
               const progress = clampPct(p.progress_percent);
@@ -491,19 +535,15 @@ export default function ProPage() {
               const currentLabel =
                 isFinished ? "Terminé" : idxCurrent >= 0 ? stepsDef[idxCurrent]?.label : statusText || "—";
 
-              const phoneDraft = phoneDraftById[p.id] ?? (p.broker_phone ?? "");
-
               return (
                 <div key={p.id} className="rounded-3xl border border-zinc-200 bg-white p-6">
                   <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <div className="text-xl font-black">
-                          {p.client_name}
-                          {p.project_title ? (
-                            <span className="text-zinc-400 font-black"> — {p.project_title}</span>
-                          ) : null}
-                        </div>
+                        <div className="text-xl font-black">{p.client_name}</div>
+                        {p.project_title && (
+                          <span className="text-xs font-black text-zinc-500">• {p.project_title}</span>
+                        )}
                         <div className="text-xs font-black tracking-widest text-zinc-400">• {t.toUpperCase()}</div>
 
                         <span className="inline-flex items-center rounded-full bg-zinc-100 px-3 py-1 text-xs font-black text-zinc-700">
@@ -513,36 +553,17 @@ export default function ProPage() {
 
                       <div className="mt-2 text-sm font-semibold text-zinc-600">Progression : {progress}%</div>
 
-                      {!canUpdate && (
-                        <div className="mt-1 text-xs font-semibold text-red-600">
-                          Actions bloquées : owner_user_id différent.
+                      {!isFinished && idxCurrent === -1 && statusText && (
+                        <div className="mt-1 text-xs font-semibold text-amber-600">
+                          Attention : status_text ne correspond à aucune étape du template ({statusText})
                         </div>
                       )}
 
-                      {/* téléphone du dossier (copié depuis profil, modifiable si besoin) */}
-                      <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div className="md:col-span-2">
-                          <div className="text-xs font-black tracking-widest text-zinc-400">TÉLÉPHONE (CÔTÉ CLIENT)</div>
-                          <input
-                            value={phoneDraft}
-                            onChange={(e) =>
-                              setPhoneDraftById((prev) => ({ ...prev, [p.id]: e.target.value }))
-                            }
-                            placeholder="ex: 06 12 34 56 78"
-                            className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 font-semibold outline-none focus:ring-2 focus:ring-black/10"
-                          />
+                      {!canUpdate && (
+                        <div className="mt-1 text-xs font-semibold text-red-600">
+                          owner_user_id manquant ou différent : actions bloquées.
                         </div>
-
-                        <div className="md:col-span-1 flex md:items-end">
-                          <button
-                            onClick={() => savePhone(p)}
-                            disabled={!canUpdate || isDeleting || savingPhoneId === p.id}
-                            className="w-full rounded-2xl bg-black text-white px-4 py-3 text-sm font-black hover:bg-zinc-800 transition disabled:opacity-50"
-                          >
-                            {savingPhoneId === p.id ? "Sauvegarde..." : "Enregistrer"}
-                          </button>
-                        </div>
-                      </div>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-3">
@@ -572,9 +593,11 @@ export default function ProPage() {
                     </div>
                   </div>
 
+                  {/* étapes */}
                   <div className="mt-5 flex flex-wrap gap-2">
                     {stepsDef.map((s, idx) => {
                       const stepIndex1 = idx + 1;
+
                       const completed = isFinished ? true : idxCurrent >= 0 ? idx < idxCurrent : false;
                       const isCurrent = !isFinished && idxCurrent >= 0 && idx === idxCurrent;
 
