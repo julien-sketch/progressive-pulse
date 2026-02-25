@@ -18,7 +18,6 @@ export default function LoginPage() {
   const supabase = useMemo(() => getSupabaseBrowser(), []);
   const [mode, setMode] = useState<Mode>("password");
 
-  // shared
   const [email, setEmail] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -31,7 +30,7 @@ export default function LoginPage() {
   const [loadingMagic, setLoadingMagic] = useState(false);
   const [cooldown, setCooldown] = useState(0);
 
-  // signup
+  // signup fields
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
@@ -76,9 +75,7 @@ export default function LoginPage() {
 
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim(),
-      options: {
-        emailRedirectTo: `${origin}/auth/callback`,
-      },
+      options: { emailRedirectTo: `${origin}/auth/callback` },
     });
 
     setLoadingMagic(false);
@@ -99,6 +96,7 @@ export default function LoginPage() {
 
     const eEmail = email.trim();
     const ePwd = password;
+
     if (!firstName.trim()) return setErr("Renseigne le prénom.");
     if (!lastName.trim()) return setErr("Renseigne le nom.");
     if (!eEmail) return setErr("Renseigne l’email.");
@@ -107,43 +105,73 @@ export default function LoginPage() {
 
     setLoadingSignup(true);
 
-    const { data, error } = await supabase.auth.signUp({
+    // 1) signUp
+    const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
       email: eEmail,
       password: ePwd,
     });
 
-    if (error) {
+    if (signUpErr) {
       setLoadingSignup(false);
-      setErr(error.message);
+      setErr(signUpErr.message);
       return;
     }
 
-    const userId = data.user?.id;
-    if (!userId) {
+    // 2) Si l'utilisateur est déjà connecté (confirmation OFF)
+    // Sinon, on tente un login direct (utile en dev)
+    let userId = signUpData.user?.id ?? null;
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const sessionUser = sessionData.session?.user ?? null;
+
+    if (sessionUser?.id) {
+      userId = sessionUser.id;
+    } else {
+      // tentative login immédiat (si confirmation OFF, ça marche)
+      const { error: loginErr } = await supabase.auth.signInWithPassword({
+        email: eEmail,
+        password: ePwd,
+      });
+      if (!loginErr) {
+        const { data: sessionData2 } = await supabase.auth.getSession();
+        userId = sessionData2.session?.user?.id ?? userId;
+      }
+    }
+
+    // 3) On met à jour le profil uniquement si on a une session
+    // (le trigger a déjà créé la ligne profiles)
+    const { data: sessionData3 } = await supabase.auth.getSession();
+    const finalUser = sessionData3.session?.user ?? null;
+
+    if (finalUser?.id) {
+      const { error: upErr } = await supabase
+        .from("profiles")
+        .update({
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          phone: phone.trim(),
+          profession,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", finalUser.id);
+
       setLoadingSignup(false);
-      setErr("Création utilisateur incomplète (userId manquant).");
+
+      if (upErr) {
+        setErr(`Compte créé, profil non mis à jour : ${upErr.message}`);
+        return;
+      }
+
+      setInfo("Compte créé. Redirection...");
+      window.location.href = "/pro";
       return;
     }
 
-    const { error: profileErr } = await supabase.from("profiles").insert({
-      user_id: userId,
-      first_name: firstName.trim(),
-      last_name: lastName.trim(),
-      phone: phone.trim(),
-      profession,
-    });
-
+    // 4) Pas de session => confirmation email ON
     setLoadingSignup(false);
-
-    if (profileErr) {
-      setErr(`Compte créé, mais profil non enregistré : ${profileErr.message}`);
-      return;
-    }
-
-    // Selon config Supabase, email de confirmation possible.
-    // Si confirmation OFF, l'utilisateur est déjà connecté.
-    setInfo("Compte créé. Redirection...");
-    window.location.href = "/pro";
+    setInfo(
+      "Compte créé. Confirme ton email pour activer l’accès, puis reconnecte-toi."
+    );
   };
 
   return (
@@ -153,13 +181,6 @@ export default function LoginPage() {
           {mode === "signup" ? "Créer un compte Pro" : "Connexion Pro"}
         </h1>
 
-        <p className="mt-2 text-sm text-zinc-500 font-semibold">
-          {mode === "signup"
-            ? "On te demande ton métier et ton téléphone pour préparer les bons dossiers automatiquement."
-            : "Connexion simple. En prod, tu peux activer magic link quand ton quota email est OK."}
-        </p>
-
-        {/* Mode switch */}
         <div className="mt-6 grid grid-cols-3 gap-2 rounded-2xl bg-zinc-50 p-2 border border-zinc-100">
           <button
             type="button"
@@ -190,11 +211,8 @@ export default function LoginPage() {
           </button>
         </div>
 
-        {/* Email */}
         <div className="mt-6">
-          <label className="mb-2 block text-xs font-black uppercase tracking-widest text-zinc-400">
-            Email
-          </label>
+          <label className="mb-2 block text-xs font-black uppercase tracking-widest text-zinc-400">Email</label>
           <input
             required
             type="email"
@@ -205,14 +223,11 @@ export default function LoginPage() {
           />
         </div>
 
-        {/* SIGNUP */}
         {mode === "signup" && (
           <form onSubmit={signup} className="mt-4 space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="mb-2 block text-xs font-black uppercase tracking-widest text-zinc-400">
-                  Prénom
-                </label>
+                <label className="mb-2 block text-xs font-black uppercase tracking-widest text-zinc-400">Prénom</label>
                 <input
                   required
                   className="w-full rounded-2xl border border-zinc-100 bg-zinc-50 p-4 outline-none focus:border-zinc-300 transition-all"
@@ -221,9 +236,7 @@ export default function LoginPage() {
                 />
               </div>
               <div>
-                <label className="mb-2 block text-xs font-black uppercase tracking-widest text-zinc-400">
-                  Nom
-                </label>
+                <label className="mb-2 block text-xs font-black uppercase tracking-widest text-zinc-400">Nom</label>
                 <input
                   required
                   className="w-full rounded-2xl border border-zinc-100 bg-zinc-50 p-4 outline-none focus:border-zinc-300 transition-all"
@@ -234,9 +247,7 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label className="mb-2 block text-xs font-black uppercase tracking-widest text-zinc-400">
-                Téléphone
-              </label>
+              <label className="mb-2 block text-xs font-black uppercase tracking-widest text-zinc-400">Téléphone</label>
               <input
                 required
                 type="tel"
@@ -248,9 +259,7 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label className="mb-2 block text-xs font-black uppercase tracking-widest text-zinc-400">
-                Métier
-              </label>
+              <label className="mb-2 block text-xs font-black uppercase tracking-widest text-zinc-400">Métier</label>
               <select
                 value={profession}
                 onChange={(e) => setProfession(e.target.value)}
@@ -265,9 +274,7 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label className="mb-2 block text-xs font-black uppercase tracking-widest text-zinc-400">
-                Mot de passe
-              </label>
+              <label className="mb-2 block text-xs font-black uppercase tracking-widest text-zinc-400">Mot de passe</label>
               <input
                 required
                 type="password"
@@ -288,13 +295,10 @@ export default function LoginPage() {
           </form>
         )}
 
-        {/* Password mode */}
         {mode === "password" && (
           <form onSubmit={loginPassword} className="mt-4 space-y-4">
             <div>
-              <label className="mb-2 block text-xs font-black uppercase tracking-widest text-zinc-400">
-                Mot de passe
-              </label>
+              <label className="mb-2 block text-xs font-black uppercase tracking-widest text-zinc-400">Mot de passe</label>
               <input
                 required
                 type="password"
@@ -315,7 +319,6 @@ export default function LoginPage() {
           </form>
         )}
 
-        {/* Magic mode */}
         {mode === "magic" && (
           <form onSubmit={sendMagicLink} className="mt-4 space-y-4">
             <button
@@ -325,10 +328,6 @@ export default function LoginPage() {
             >
               {loadingMagic ? "Envoi..." : cooldown > 0 ? `Réessayer dans ${cooldown}s` : "Envoyer le lien"}
             </button>
-
-            <p className="text-xs font-semibold text-zinc-500">
-              Ton projet Supabase est limité à 2 emails/heure : si tu testes beaucoup, ça bloque.
-            </p>
           </form>
         )}
 
