@@ -3,15 +3,24 @@
 import { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 
+type Profile = {
+  user_id: string;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+  profession: string;
+};
+
 type Project = {
   id: string;
   created_at: string | null;
   client_name: string;
+  project_title: string | null;
   progress_percent: number | null;
   status_text: string | null;
   access_token: string;
   broker_email: string | null;
-  broker_phone: string | null; // ✅ AJOUT
+  broker_phone: string | null;
   drive_folder_url: string | null;
   updated_at: string | null;
   project_type: string | null;
@@ -41,20 +50,24 @@ const STEPS_BY_TYPE: Record<string, StepDef[]> = {
     { label: "Remboursement en cours" },
     { label: "Paiement validé" },
   ],
+  courtier: [
+    { label: "Documents reçus" },
+    { label: "Dossier complet" },
+    { label: "Étude / Analyse" },
+    { label: "Dépôt banque" },
+    { label: "Accord de principe" },
+    { label: "Édition offre" },
+    { label: "Signature" },
+    { label: "Déblocage fonds" },
+  ],
+  artisan: [{ label: "Demande reçue" }, { label: "Devis" }, { label: "Planification" }, { label: "Terminé" }],
+  freelance: [{ label: "Demande reçue" }, { label: "Devis" }, { label: "En cours" }, { label: "Livré" }],
   other: [{ label: "Documents reçus" }, { label: "Dossier complet" }, { label: "Terminé" }],
 };
 
 function clampPct(n: number | null | undefined) {
   const v = typeof n === "number" ? n : 0;
   return Math.max(0, Math.min(100, Math.round(v)));
-}
-
-function normalizeType(t: string | null | undefined) {
-  const v = (t ?? "").toLowerCase().trim();
-  if (v === "immobilier") return "immo";
-  if (v === "formation") return "of";
-  if (v === "immo" || v === "of") return v;
-  return "other";
 }
 
 function makeAccessToken(clientName: string) {
@@ -77,18 +90,19 @@ export default function ProPage() {
   const [userId, setUserId] = useState<string>("");
   const [userEmail, setUserEmail] = useState<string>("");
 
+  const [profile, setProfile] = useState<Profile | null>(null);
+
   const [credits, setCredits] = useState<number>(0);
   const [projects, setProjects] = useState<Project[]>([]);
 
   // create
-  const [typeUi, setTypeUi] = useState<string>("Immobilier");
   const [clientName, setClientName] = useState<string>("");
+  const [projectTitle, setProjectTitle] = useState<string>(""); // ✅ optionnel
   const [creating, setCreating] = useState(false);
 
   const [updatingProjectId, setUpdatingProjectId] = useState<string | null>(null);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
 
-  // ✅ édition téléphone par dossier
   const [phoneDraftById, setPhoneDraftById] = useState<Record<string, string>>({});
   const [savingPhoneId, setSavingPhoneId] = useState<string | null>(null);
 
@@ -117,6 +131,21 @@ export default function ProPage() {
     setUserId(uid);
     setUserEmail(email);
 
+    // profile
+    const { data: prof, error: profErr } = await supabase
+      .from("profiles")
+      .select("user_id, first_name, last_name, phone, profession")
+      .eq("user_id", uid)
+      .maybeSingle();
+
+    if (profErr) {
+      console.error("profiles:", profErr);
+      setProfile(null);
+    } else {
+      setProfile((prof ?? null) as any);
+    }
+
+    // wallet
     const { data: walletRow, error: walletErr } = await supabase
       .from("credit_wallets")
       .select("credits")
@@ -130,13 +159,13 @@ export default function ProPage() {
       setCredits(Number(walletRow?.credits ?? 0));
     }
 
-    // ✅ IMPORTANT: on inclut broker_phone
+    // projects: filtre solide par owner_user_id
     const { data: projectsData, error: projectsErr } = await supabase
       .from("projects")
       .select(
-        "id,created_at,client_name,progress_percent,status_text,access_token,broker_email,broker_phone,drive_folder_url,updated_at,project_type,owner_user_id"
+        "id,created_at,client_name,project_title,progress_percent,status_text,access_token,broker_email,broker_phone,drive_folder_url,updated_at,project_type,owner_user_id"
       )
-      .eq("broker_email", email)
+      .eq("owner_user_id", uid)
       .order("created_at", { ascending: false });
 
     if (projectsErr) {
@@ -149,7 +178,6 @@ export default function ProPage() {
     const rows = (projectsData ?? []) as Project[];
     setProjects(rows);
 
-    // ✅ initialise les drafts téléphone depuis la DB
     setPhoneDraftById((prev) => {
       const next = { ...prev };
       for (const p of rows) {
@@ -185,14 +213,21 @@ export default function ProPage() {
     if (creating) return;
 
     const name = clientName.trim();
+    const title = projectTitle.trim();
+
     if (!name) return alert("Renseigne le nom du client.");
     if (!userId || !userEmail) return alert("Utilisateur non chargé.");
 
+    // ✅ profil obligatoire
+    if (!profile?.profession) return alert("Profil incomplet : choisis ton métier.");
+    if (!profile?.phone) return alert("Profil incomplet : renseigne ton téléphone.");
+
     setCreating(true);
 
-    const projectType = normalizeType(typeUi);
     const accessToken = makeAccessToken(name);
+    const projectType = profile.profession;
 
+    // RPC existant (on garde ton système crédits)
     const { error } = await supabase.rpc("create_project_with_credit", {
       p_client_name: name,
       p_project_type: projectType,
@@ -206,7 +241,28 @@ export default function ProPage() {
       return;
     }
 
+    // ✅ Post-update: project_title + broker_phone (copie depuis profil)
+    // On retrouve le projet via access_token (unique côté usage)
+    const { data: created, error: findErr } = await supabase
+      .from("projects")
+      .select("id")
+      .eq("access_token", accessToken)
+      .maybeSingle();
+
+    if (!findErr && created?.id) {
+      await supabase
+        .from("projects")
+        .update({
+          project_title: title || null,
+          broker_phone: profile.phone || null,
+          broker_email: userEmail,
+          owner_user_id: userId,
+        })
+        .eq("id", created.id);
+    }
+
     setClientName("");
+    setProjectTitle("");
     setCreating(false);
     await loadAll();
   };
@@ -231,20 +287,17 @@ export default function ProPage() {
     await loadAll();
   };
 
-  // ✅ Sauvegarde téléphone (par dossier)
   const savePhone = async (project: Project) => {
     if (savingPhoneId) return;
-    if (!userEmail) return alert("Email utilisateur non chargé.");
 
     const draft = (phoneDraftById[project.id] ?? "").trim();
-
     setSavingPhoneId(project.id);
 
     const { error } = await supabase
       .from("projects")
       .update({ broker_phone: draft || null })
       .eq("id", project.id)
-      .eq("broker_email", userEmail); // sécurité: tu ne modifies que tes dossiers
+      .eq("owner_user_id", userId);
 
     if (error) {
       console.error("update broker_phone error:", error);
@@ -260,7 +313,7 @@ export default function ProPage() {
   const deleteDossier = async (project: Project) => {
     if (deletingProjectId) return;
     if (!userId) return alert("Utilisateur non chargé.");
-    if (project.owner_user_id !== userId) return alert("Suppression refusée (owner_user_id).");
+    if (project.owner_user_id !== userId) return alert("Suppression refusée.");
 
     const ok = confirm(
       `Supprimer définitivement le dossier "${project.client_name}" ?\n\nCette action est irréversible.`
@@ -302,6 +355,8 @@ export default function ProPage() {
     return <div className="min-h-screen flex items-center justify-center">Chargement...</div>;
   }
 
+  const professionKey = profile?.profession || "other";
+
   return (
     <div className="min-h-screen bg-white px-6 py-8">
       <div className="max-w-6xl mx-auto">
@@ -310,6 +365,11 @@ export default function ProPage() {
           <div>
             <h1 className="text-4xl font-black tracking-tight">Dashboard Pro</h1>
             <p className="text-sm text-zinc-500 mt-1">Connecté : {userEmail}</p>
+            {profile && (
+              <p className="text-xs font-bold text-zinc-400 mt-1">
+                Métier : {profile.profession} • Téléphone : {profile.phone || "—"}
+              </p>
+            )}
           </div>
 
           <button
@@ -331,9 +391,7 @@ export default function ProPage() {
               <div className="pb-2 text-zinc-600 font-semibold">dossiers restants</div>
             </div>
 
-            <p className="mt-3 text-sm text-zinc-500 font-semibold">
-              1 dossier créé = 1 crédit consommé.
-            </p>
+            <p className="mt-3 text-sm text-zinc-500 font-semibold">1 dossier créé = 1 crédit consommé.</p>
 
             <div className="mt-6 flex items-center gap-3">
               <a
@@ -358,44 +416,54 @@ export default function ProPage() {
           <div className="rounded-3xl border border-zinc-200 bg-white shadow-sm p-8">
             <div className="text-xs font-black tracking-widest text-zinc-400">CRÉER UN DOSSIER</div>
 
-            <div className="mt-6 space-y-4">
-              <div>
-                <div className="text-xs font-black tracking-widest text-zinc-400">TYPE</div>
-                <select
-                  value={typeUi}
-                  onChange={(e) => setTypeUi(e.target.value)}
-                  className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 font-semibold outline-none focus:ring-2 focus:ring-black/10"
-                >
-                  <option>Immobilier</option>
-                  <option>Formation</option>
-                  <option>Autre</option>
-                </select>
-              </div>
-
-              <div>
-                <div className="text-xs font-black tracking-widest text-zinc-400">CLIENT</div>
-                <input
-                  value={clientName}
-                  onChange={(e) => setClientName(e.target.value)}
-                  placeholder="ex: Mr ou Mme xxxxx"
-                  className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 font-semibold outline-none focus:ring-2 focus:ring-black/10"
-                />
-              </div>
-
-              <button
-                onClick={createDossier}
-                disabled={creating}
-                className="mt-2 w-full rounded-2xl bg-black text-white px-6 py-4 font-black hover:bg-zinc-800 transition disabled:opacity-40"
-              >
-                {creating ? "Création..." : "Créer (1 crédit)"}
-              </button>
-
-              {credits <= 0 && (
-                <div className="text-xs font-semibold text-zinc-500">
-                  Plus de crédits : utilise “Acheter des dossiers”.
+            {!profile?.profession || !profile?.phone ? (
+              <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900 font-bold">
+                Profil incomplet : métier et téléphone obligatoires.
+                <div className="mt-2 text-sm font-semibold">
+                  Va sur la page d’inscription ou complète ton profil dans Supabase (temporaire).
                 </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div className="mt-6 space-y-4">
+                <div>
+                  <div className="text-xs font-black tracking-widest text-zinc-400">CLIENT</div>
+                  <input
+                    value={clientName}
+                    onChange={(e) => setClientName(e.target.value)}
+                    placeholder="ex: Mr ou Mme X"
+                    className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 font-semibold outline-none focus:ring-2 focus:ring-black/10"
+                  />
+                </div>
+
+                <div>
+                  <div className="text-xs font-black tracking-widest text-zinc-400">NOM DU DOSSIER (OPTIONNEL)</div>
+                  <input
+                    value={projectTitle}
+                    onChange={(e) => setProjectTitle(e.target.value)}
+                    placeholder="ex: Achat résidence principale"
+                    className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 font-semibold outline-none focus:ring-2 focus:ring-black/10"
+                  />
+                </div>
+
+                <div className="text-xs font-semibold text-zinc-500">
+                  Template automatique : <b>{professionKey}</b> (défini par ton profil).
+                </div>
+
+                <button
+                  onClick={createDossier}
+                  disabled={creating}
+                  className="mt-2 w-full rounded-2xl bg-black text-white px-6 py-4 font-black hover:bg-zinc-800 transition disabled:opacity-40"
+                >
+                  {creating ? "Création..." : "Créer (1 crédit)"}
+                </button>
+
+                {credits <= 0 && (
+                  <div className="text-xs font-semibold text-zinc-500">
+                    Plus de crédits : utilise “Acheter des dossiers”.
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -408,7 +476,7 @@ export default function ProPage() {
 
           <div className="mt-6 space-y-6">
             {projects.map((p) => {
-              const t = normalizeType(p.project_type);
+              const t = (p.project_type ?? professionKey) as string;
               const stepsDef = STEPS_BY_TYPE[t] ?? STEPS_BY_TYPE.other;
 
               const progress = clampPct(p.progress_percent);
@@ -430,7 +498,12 @@ export default function ProPage() {
                   <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <div className="text-xl font-black">{p.client_name}</div>
+                        <div className="text-xl font-black">
+                          {p.client_name}
+                          {p.project_title ? (
+                            <span className="text-zinc-400 font-black"> — {p.project_title}</span>
+                          ) : null}
+                        </div>
                         <div className="text-xs font-black tracking-widest text-zinc-400">• {t.toUpperCase()}</div>
 
                         <span className="inline-flex items-center rounded-full bg-zinc-100 px-3 py-1 text-xs font-black text-zinc-700">
@@ -438,26 +511,18 @@ export default function ProPage() {
                         </span>
                       </div>
 
-                      <div className="mt-2 text-sm font-semibold text-zinc-600">
-                        Progression : {progress}%
-                      </div>
-
-                      {!isFinished && idxCurrent === -1 && statusText && (
-                        <div className="mt-1 text-xs font-semibold text-amber-600">
-                          Attention : status_text ne correspond à aucune étape du template ({statusText})
-                        </div>
-                      )}
+                      <div className="mt-2 text-sm font-semibold text-zinc-600">Progression : {progress}%</div>
 
                       {!canUpdate && (
                         <div className="mt-1 text-xs font-semibold text-red-600">
-                          owner_user_id manquant ou différent : actions bloquées.
+                          Actions bloquées : owner_user_id différent.
                         </div>
                       )}
 
-                      {/* ✅ CONTACT PRO: téléphone éditable */}
+                      {/* téléphone du dossier (copié depuis profil, modifiable si besoin) */}
                       <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div className="md:col-span-2">
-                          <div className="text-xs font-black tracking-widest text-zinc-400">TÉLÉPHONE PRO</div>
+                          <div className="text-xs font-black tracking-widest text-zinc-400">TÉLÉPHONE (CÔTÉ CLIENT)</div>
                           <input
                             value={phoneDraft}
                             onChange={(e) =>
@@ -466,9 +531,6 @@ export default function ProPage() {
                             placeholder="ex: 06 12 34 56 78"
                             className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 font-semibold outline-none focus:ring-2 focus:ring-black/10"
                           />
-                          <div className="mt-1 text-xs text-zinc-500 font-semibold">
-                            Ce numéro apparaîtra côté client (bouton “Appeler mon agent”).
-                          </div>
                         </div>
 
                         <div className="md:col-span-1 flex md:items-end">
@@ -476,7 +538,6 @@ export default function ProPage() {
                             onClick={() => savePhone(p)}
                             disabled={!canUpdate || isDeleting || savingPhoneId === p.id}
                             className="w-full rounded-2xl bg-black text-white px-4 py-3 text-sm font-black hover:bg-zinc-800 transition disabled:opacity-50"
-                            title={!canUpdate ? "Action bloquée (owner_user_id)" : ""}
                           >
                             {savingPhoneId === p.id ? "Sauvegarde..." : "Enregistrer"}
                           </button>
@@ -511,11 +572,9 @@ export default function ProPage() {
                     </div>
                   </div>
 
-                  {/* ✅ Boutons étapes */}
                   <div className="mt-5 flex flex-wrap gap-2">
                     {stepsDef.map((s, idx) => {
                       const stepIndex1 = idx + 1;
-
                       const completed = isFinished ? true : idxCurrent >= 0 ? idx < idxCurrent : false;
                       const isCurrent = !isFinished && idxCurrent >= 0 && idx === idxCurrent;
 
