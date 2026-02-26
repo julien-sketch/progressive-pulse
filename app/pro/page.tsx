@@ -204,7 +204,7 @@ export default function ProPage() {
       .select(
         "id,created_at,client_name,project_title,progress_percent,status_text,access_token,broker_email,broker_phone,drive_folder_url,updated_at,project_type,owner_user_id"
       )
-      .eq("owner_user_id", uid) // ✅ on arrête le filtre email, on utilise owner_user_id
+      .eq("owner_user_id", uid)
       .order("created_at", { ascending: false });
 
     if (projectsErr) {
@@ -240,7 +240,7 @@ export default function ProPage() {
 
   const profileOk =
     !!profile &&
-    normalizeType(profile.profession) !== "other" && // tu peux enlever ça si tu acceptes "other"
+    normalizeType(profile.profession) !== "other" &&
     !!(profile.phone && profile.phone.trim().length >= 6);
 
   const saveProfile = async () => {
@@ -284,7 +284,6 @@ export default function ProPage() {
 
     const accessToken = makeAccessToken(name);
 
-    // ✅ Nouvelle signature de la RPC
     const { error } = await supabase.rpc("create_project_with_credit", {
       p_client_name: name,
       p_access_token: accessToken,
@@ -373,262 +372,288 @@ export default function ProPage() {
     normalizeType(profile?.profession);
 
   return (
-    <div className="min-h-screen bg-white px-6 py-8">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen bg-[#f8f7f6] px-6 py-8 text-slate-900">
+      <div className="max-w-7xl mx-auto">
         {/* HEADER */}
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-4xl font-black tracking-tight">Dashboard Pro</h1>
-            <p className="text-sm text-zinc-500 mt-1">Connecté : {userEmail}</p>
-            <p className="text-sm text-zinc-500 mt-1">
-              Métier : {profileLoading ? "…" : metierLabel || "—"} • Téléphone :{" "}
-              {profileLoading ? "…" : profile?.phone || "—"}
-            </p>
+            <div className="inline-block px-2 py-1 rounded-md bg-[#e77e23]/10 text-[#e77e23] text-xs font-extrabold uppercase tracking-wider">
+              Pro-Pulse
+            </div>
+            <h1 className="mt-3 text-4xl font-extrabold tracking-tight">Dashboard Pro</h1>
+            <p className="text-sm text-slate-500 mt-1 font-semibold">Connecté : {userEmail}</p>
           </div>
 
           <button
             onClick={logout}
-            className="rounded-full bg-black text-white px-6 py-3 font-bold hover:bg-zinc-800 transition"
+            className="rounded-2xl bg-[#e77e23] text-white px-6 py-3 font-extrabold hover:bg-[#e77e23]/90 transition"
           >
             Déconnexion
           </button>
         </div>
 
-        {/* TOP GRID */}
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* CREDITS */}
-          <div className="rounded-3xl border border-zinc-200 bg-white shadow-sm p-8">
-            <div className="text-xs font-black tracking-widest text-zinc-400">CRÉDITS</div>
-
-            <div className="mt-4 flex items-end gap-3">
-              <div className="text-6xl font-black leading-none">{credits}</div>
-              <div className="pb-2 text-zinc-600 font-semibold">dossiers restants</div>
-            </div>
-
-            <p className="mt-3 text-sm text-zinc-500 font-semibold">
-              1 dossier créé = 1 crédit consommé.
-            </p>
-
-            <div className="mt-6 flex items-center gap-3">
-              <a
-                href={stripeCheckoutUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center justify-center rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-sm font-bold hover:bg-zinc-50 transition"
-              >
-                Acheter des dossiers
-              </a>
-
-              <button
-                onClick={loadAll}
-                className="inline-flex items-center justify-center rounded-2xl bg-black text-white px-4 py-2 text-sm font-bold hover:bg-zinc-800 transition"
-              >
-                Rafraîchir
-              </button>
-            </div>
-          </div>
-
-          {/* PROFIL + CREATE */}
-          <div className="rounded-3xl border border-zinc-200 bg-white shadow-sm p-8">
-            <div className="text-xs font-black tracking-widest text-zinc-400">PROFIL & CRÉATION</div>
-
-            {/* ✅ Pas d'overlay plein écran : juste un bloc d'alerte */}
-            {!profileOk && (
-              <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900 font-bold">
-                Profil incomplet : métier et téléphone obligatoires.
-              </div>
-            )}
-
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <div className="text-xs font-black tracking-widest text-zinc-400">MÉTIER</div>
-                <select
-                  value={professionDraft}
-                  onChange={(e) => setProfessionDraft(e.target.value)}
-                  className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 font-semibold outline-none focus:ring-2 focus:ring-black/10"
+        {/* LAYOUT: Main cards (2) + Sidebar small */}
+        <div className="mt-8 grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
+          {/* MAIN */}
+          <div className="space-y-6">
+            {/* MAIN CARD 1: Nombre de dossiers */}
+            <div className="rounded-3xl border border-[#e77e23]/10 bg-white shadow-sm p-8">
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-extrabold tracking-widest text-slate-400">DOSSIERS</div>
+                <button
+                  onClick={loadAll}
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-extrabold hover:bg-slate-50 transition"
                 >
-                  {PROFESSION_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
+                  Rafraîchir
+                </button>
               </div>
 
-              <div>
-                <div className="text-xs font-black tracking-widest text-zinc-400">TÉLÉPHONE</div>
-                <input
-                  value={phoneDraft}
-                  onChange={(e) => setPhoneDraft(e.target.value)}
-                  placeholder="ex: 06 12 34 56 78"
-                  className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 font-semibold outline-none focus:ring-2 focus:ring-black/10"
-                />
+              <div className="mt-4 flex items-end gap-3">
+                <div className="text-6xl font-extrabold leading-none">{projects.length}</div>
+                <div className="pb-2 text-slate-600 font-semibold">dossiers en cours / créés</div>
               </div>
+
+              {!profileOk && (
+                <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900 font-bold">
+                  Profil incomplet : métier et téléphone obligatoires (sinon création bloquée).
+                </div>
+              )}
             </div>
 
-            <button
-              onClick={saveProfile}
-              disabled={savingProfile}
-              className="mt-4 w-full rounded-2xl bg-black text-white px-6 py-3 font-black hover:bg-zinc-800 transition disabled:opacity-50"
-            >
-              {savingProfile ? "Sauvegarde..." : "Enregistrer mon profil"}
-            </button>
+            {/* MAIN CARD 2: Création de dossier */}
+            <div className="rounded-3xl border border-[#e77e23]/10 bg-white shadow-sm p-8">
+              <div className="text-xs font-extrabold tracking-widest text-slate-400">
+                CRÉER UN DOSSIER
+              </div>
 
-            <div className="mt-8 border-t border-zinc-100 pt-6">
-              <div className="text-xs font-black tracking-widest text-zinc-400">CRÉER UN DOSSIER</div>
-
-              <div className="mt-4 space-y-4">
+              <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <div className="text-xs font-black tracking-widest text-zinc-400">CLIENT</div>
+                  <div className="text-xs font-extrabold tracking-widest text-slate-400">CLIENT</div>
                   <input
                     value={clientName}
                     onChange={(e) => setClientName(e.target.value)}
                     placeholder="ex: Mr ou Mme X"
-                    className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 font-semibold outline-none focus:ring-2 focus:ring-black/10"
+                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-semibold outline-none focus:border-[#e77e23] transition"
                   />
                 </div>
 
                 <div>
-                  <div className="text-xs font-black tracking-widest text-zinc-400">NOM DU DOSSIER (FACULTATIF)</div>
+                  <div className="text-xs font-extrabold tracking-widest text-slate-400">
+                    NOM DU DOSSIER (FACULTATIF)
+                  </div>
                   <input
                     value={projectTitle}
                     onChange={(e) => setProjectTitle(e.target.value)}
                     placeholder="ex: Achat résidence principale"
-                    className="mt-2 w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 font-semibold outline-none focus:ring-2 focus:ring-black/10"
+                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-semibold outline-none focus:border-[#e77e23] transition"
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={createDossier}
+                disabled={creating || !profileOk}
+                className="mt-5 w-full rounded-2xl bg-[#e77e23] text-white px-6 py-4 font-extrabold hover:bg-[#e77e23]/90 transition disabled:opacity-40"
+                title={!profileOk ? "Complète ton profil d'abord" : ""}
+              >
+                {creating ? "Création..." : "Créer (1 crédit)"}
+              </button>
+
+              <p className="mt-3 text-sm text-slate-500 font-semibold">
+                1 dossier créé = 1 crédit consommé.
+              </p>
+            </div>
+
+            {/* LISTE DOSSIERS (inchangée en logique) */}
+            <div className="rounded-3xl border border-[#e77e23]/10 bg-white shadow-sm p-8">
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-extrabold tracking-widest text-slate-400">LISTE DES DOSSIERS</div>
+                <div className="text-sm font-extrabold text-slate-500">{projects.length}</div>
+              </div>
+
+              <div className="mt-6 space-y-6">
+                {projects.map((p) => {
+                  const t = normalizeType(p.project_type);
+                  const stepsDef = STEPS_BY_TYPE[t] ?? STEPS_BY_TYPE.other;
+
+                  const progress = clampPct(p.progress_percent);
+                  const canUpdate = p.owner_user_id === userId;
+                  const isBusy = updatingProjectId === p.id;
+                  const isDeleting = deletingProjectId === p.id;
+
+                  const statusText = (p.status_text ?? "").trim();
+                  const idxCurrent = stepsDef.findIndex((s) => s.label === statusText);
+                  const isFinished = statusText.toLowerCase() === "terminé";
+
+                  const currentLabel =
+                    isFinished ? "Terminé" : idxCurrent >= 0 ? stepsDef[idxCurrent]?.label : statusText || "—";
+
+                  return (
+                    <div key={p.id} className="rounded-3xl border border-slate-200 bg-white p-6">
+                      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <div className="text-xl font-extrabold">{p.client_name}</div>
+                            {p.project_title && (
+                              <span className="text-xs font-extrabold text-slate-500">• {p.project_title}</span>
+                            )}
+                            <div className="text-xs font-extrabold tracking-widest text-slate-400">• {t.toUpperCase()}</div>
+
+                            <span className="inline-flex items-center rounded-full bg-[#e77e23]/10 px-3 py-1 text-xs font-extrabold text-[#e77e23]">
+                              Étape en cours : {currentLabel}
+                            </span>
+                          </div>
+
+                          <div className="mt-2 text-sm font-semibold text-slate-600">Progression : {progress}%</div>
+
+                          {!isFinished && idxCurrent === -1 && statusText && (
+                            <div className="mt-1 text-xs font-semibold text-amber-600">
+                              Attention : status_text ne correspond à aucune étape du template ({statusText})
+                            </div>
+                          )}
+
+                          {!canUpdate && (
+                            <div className="mt-1 text-xs font-semibold text-red-600">
+                              owner_user_id manquant ou différent : actions bloquées.
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => copyLink(p.access_token)}
+                            className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-extrabold hover:bg-slate-50 transition"
+                          >
+                            Copier lien
+                          </button>
+
+                          <a
+                            href={`/track/${p.access_token}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-2xl bg-[#e77e23] text-white px-4 py-2 text-sm font-extrabold hover:bg-[#e77e23]/90 transition"
+                          >
+                            Ouvrir
+                          </a>
+
+                          <button
+                            onClick={() => deleteDossier(p)}
+                            disabled={!canUpdate || isDeleting}
+                            className="rounded-2xl border border-red-200 bg-white px-4 py-2 text-sm font-extrabold text-red-600 hover:bg-red-50 transition disabled:opacity-50"
+                          >
+                            {isDeleting ? "Suppression..." : "Supprimer"}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* étapes */}
+                      <div className="mt-5 flex flex-wrap gap-2">
+                        {stepsDef.map((s, idx) => {
+                          const stepIndex1 = idx + 1;
+
+                          const completed = isFinished ? true : idxCurrent >= 0 ? idx < idxCurrent : false;
+                          const isCurrent = !isFinished && idxCurrent >= 0 && idx === idxCurrent;
+
+                          const base = "rounded-full px-4 py-2 text-xs font-extrabold border transition";
+                          const disabled = !canUpdate || isBusy || isDeleting ? "opacity-50" : "";
+
+                          const cls = isCurrent
+                            ? `${base} bg-[#e77e23] text-white border-[#e77e23]`
+                            : completed
+                            ? `${base} bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100`
+                            : `${base} bg-white text-slate-700 border-slate-200 hover:bg-slate-50`;
+
+                          return (
+                            <button
+                              key={`${p.id}-${s.label}`}
+                              onClick={() => setProjectStep(p, stepIndex1)}
+                              disabled={!canUpdate || isBusy || isDeleting}
+                              className={`${cls} ${disabled}`}
+                              title={`Étape ${stepIndex1}`}
+                            >
+                              {s.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {projects.length === 0 && (
+                  <div className="text-sm text-slate-500 font-semibold">Aucun dossier pour le moment.</div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* SIDEBAR (profil petit + crédits) */}
+          <aside className="space-y-6">
+            {/* Profil (petit) */}
+            <div className="rounded-3xl border border-[#e77e23]/10 bg-white shadow-sm p-6">
+              <div className="text-xs font-extrabold tracking-widest text-slate-400">PROFIL</div>
+              <p className="mt-2 text-sm text-slate-600 font-semibold">
+                Métier : {profileLoading ? "…" : metierLabel || "—"} <br />
+                Téléphone : {profileLoading ? "…" : profile?.phone || "—"}
+              </p>
+
+              <div className="mt-4 space-y-3">
+                <div>
+                  <div className="text-[11px] font-extrabold tracking-widest text-slate-400">MÉTIER</div>
+                  <select
+                    value={professionDraft}
+                    onChange={(e) => setProfessionDraft(e.target.value)}
+                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-semibold outline-none focus:border-[#e77e23] transition"
+                  >
+                    {PROFESSION_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <div className="text-[11px] font-extrabold tracking-widest text-slate-400">TÉLÉPHONE</div>
+                  <input
+                    value={phoneDraft}
+                    onChange={(e) => setPhoneDraft(e.target.value)}
+                    placeholder="ex: 06 12 34 56 78"
+                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-semibold outline-none focus:border-[#e77e23] transition"
                   />
                 </div>
 
                 <button
-                  onClick={createDossier}
-                  disabled={creating || !profileOk}
-                  className="mt-2 w-full rounded-2xl bg-black text-white px-6 py-4 font-black hover:bg-zinc-800 transition disabled:opacity-40"
-                  title={!profileOk ? "Complète ton profil d'abord" : ""}
+                  onClick={saveProfile}
+                  disabled={savingProfile}
+                  className="w-full rounded-2xl bg-[#e77e23] text-white px-6 py-3 font-extrabold hover:bg-[#e77e23]/90 transition disabled:opacity-50"
                 >
-                  {creating ? "Création..." : "Créer (1 crédit)"}
+                  {savingProfile ? "Sauvegarde..." : "Enregistrer"}
                 </button>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* DOSSIERS */}
-        <div className="mt-8 rounded-3xl border border-zinc-200 bg-white shadow-sm p-8">
-          <div className="flex items-center justify-between">
-            <div className="text-xs font-black tracking-widest text-zinc-400">DOSSIERS</div>
-            <div className="text-sm font-black text-zinc-500">{projects.length}</div>
-          </div>
+            {/* Crédits (secondaire) */}
+            <div className="rounded-3xl border border-[#e77e23]/10 bg-white shadow-sm p-6">
+              <div className="text-xs font-extrabold tracking-widest text-slate-400">CRÉDITS</div>
 
-          <div className="mt-6 space-y-6">
-            {projects.map((p) => {
-              const t = normalizeType(p.project_type);
-              const stepsDef = STEPS_BY_TYPE[t] ?? STEPS_BY_TYPE.other;
+              <div className="mt-3 flex items-end gap-3">
+                <div className="text-5xl font-extrabold leading-none">{credits}</div>
+                <div className="pb-2 text-slate-600 font-semibold">restants</div>
+              </div>
 
-              const progress = clampPct(p.progress_percent);
-              const canUpdate = p.owner_user_id === userId;
-              const isBusy = updatingProjectId === p.id;
-              const isDeleting = deletingProjectId === p.id;
-
-              const statusText = (p.status_text ?? "").trim();
-              const idxCurrent = stepsDef.findIndex((s) => s.label === statusText);
-              const isFinished = statusText.toLowerCase() === "terminé";
-
-              const currentLabel =
-                isFinished ? "Terminé" : idxCurrent >= 0 ? stepsDef[idxCurrent]?.label : statusText || "—";
-
-              return (
-                <div key={p.id} className="rounded-3xl border border-zinc-200 bg-white p-6">
-                  <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <div className="text-xl font-black">{p.client_name}</div>
-                        {p.project_title && (
-                          <span className="text-xs font-black text-zinc-500">• {p.project_title}</span>
-                        )}
-                        <div className="text-xs font-black tracking-widest text-zinc-400">• {t.toUpperCase()}</div>
-
-                        <span className="inline-flex items-center rounded-full bg-zinc-100 px-3 py-1 text-xs font-black text-zinc-700">
-                          Étape en cours : {currentLabel}
-                        </span>
-                      </div>
-
-                      <div className="mt-2 text-sm font-semibold text-zinc-600">Progression : {progress}%</div>
-
-                      {!isFinished && idxCurrent === -1 && statusText && (
-                        <div className="mt-1 text-xs font-semibold text-amber-600">
-                          Attention : status_text ne correspond à aucune étape du template ({statusText})
-                        </div>
-                      )}
-
-                      {!canUpdate && (
-                        <div className="mt-1 text-xs font-semibold text-red-600">
-                          owner_user_id manquant ou différent : actions bloquées.
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => copyLink(p.access_token)}
-                        className="rounded-2xl border border-zinc-200 bg-white px-4 py-2 text-sm font-bold hover:bg-zinc-50 transition"
-                      >
-                        Copier lien
-                      </button>
-
-                      <a
-                        href={`/track/${p.access_token}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="rounded-2xl bg-black text-white px-4 py-2 text-sm font-bold hover:bg-zinc-800 transition"
-                      >
-                        Ouvrir
-                      </a>
-
-                      <button
-                        onClick={() => deleteDossier(p)}
-                        disabled={!canUpdate || isDeleting}
-                        className="rounded-2xl border border-red-200 bg-white px-4 py-2 text-sm font-black text-red-600 hover:bg-red-50 transition disabled:opacity-50"
-                      >
-                        {isDeleting ? "Suppression..." : "Supprimer"}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* étapes */}
-                  <div className="mt-5 flex flex-wrap gap-2">
-                    {stepsDef.map((s, idx) => {
-                      const stepIndex1 = idx + 1;
-
-                      const completed = isFinished ? true : idxCurrent >= 0 ? idx < idxCurrent : false;
-                      const isCurrent = !isFinished && idxCurrent >= 0 && idx === idxCurrent;
-
-                      const base = "rounded-full px-4 py-2 text-xs font-black border transition";
-                      const disabled = !canUpdate || isBusy || isDeleting ? "opacity-50" : "";
-
-                      const cls = isCurrent
-                        ? `${base} bg-black text-white border-black`
-                        : completed
-                        ? `${base} bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100`
-                        : `${base} bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50`;
-
-                      return (
-                        <button
-                          key={`${p.id}-${s.label}`}
-                          onClick={() => setProjectStep(p, stepIndex1)}
-                          disabled={!canUpdate || isBusy || isDeleting}
-                          className={`${cls} ${disabled}`}
-                          title={`Étape ${stepIndex1}`}
-                        >
-                          {s.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-
-            {projects.length === 0 && <div className="text-sm text-zinc-500">Aucun dossier pour le moment.</div>}
-          </div>
+              <div className="mt-5 flex items-center gap-3">
+                <a
+                  href={stripeCheckoutUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex w-full items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-extrabold hover:bg-slate-50 transition"
+                >
+                  Acheter
+                </a>
+              </div>
+            </div>
+          </aside>
         </div>
       </div>
     </div>
