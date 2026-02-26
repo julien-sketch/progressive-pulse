@@ -248,44 +248,22 @@ export default function ClientTrack({ token }: { token: string }) {
   return (
     <div className="min-h-screen bg-[#f8f7f6] text-slate-900 flex flex-col">
       {/* Header sticky (comme ton design) */}
-      <header className="sticky top-0 z-10 bg-[#f8f7f6]/80 backdrop-blur-md border-b border-[#e77e23]/10">
-        <div className="flex items-center p-4 justify-between max-w-2xl mx-auto w-full">
-          <button
-            type="button"
-            onClick={() => window.history.back()}
-            className="flex size-10 items-center justify-center rounded-full hover:bg-[#e77e23]/10 transition-colors"
-            aria-label="Retour"
-          >
-            <ArrowLeft className="size-5" />
-          </button>
-
-          <h1 className="text-lg font-bold leading-tight tracking-tight flex-1 text-center">
-            Suivi de dossier
-          </h1>
-
-          <button
-            type="button"
-            className="flex size-10 items-center justify-center rounded-full hover:bg-[#e77e23]/10 transition-colors relative"
-            aria-label="Notifications"
-          >
-            <Bell className="size-5" />
-            <span className="absolute top-2 right-2 size-2 bg-[#e77e23] rounded-full border-2 border-[#f8f7f6]" />
-          </button>
-        </div>
-      </header>
+      <header className="border-b border-[#e77e23]/10 bg-[#f8f7f6]">
+  <div className="max-w-2xl mx-auto px-4 py-6 text-center">
+    <div className="inline-block px-2 py-1 rounded-md bg-[#e77e23]/10 text-[#e77e23] text-xs font-extrabold uppercase tracking-wider">
+      Pro-Pulse
+    </div>
+    <h1 className="mt-3 text-xl font-extrabold tracking-tight text-slate-900">
+      Suivi de dossier
+    </h1>
+  </div>
+</header>
 
       <main className="flex-1 max-w-2xl mx-auto w-full pb-32">
         {/* Status Card */}
         <div className="p-4">
           <div className="flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm border border-[#e77e23]/5">
-            <div
-              className="w-full bg-center bg-no-repeat aspect-[21/9] bg-cover"
-              style={{
-                backgroundImage:
-                  'url("https://lh3.googleusercontent.com/aida-public/AB6AXuAktHx_RvvaBqQZ58Avotbj20-QEvn9mR-MWFsgsS49-mBf1CnrRdBOpmFzLo4ISwn94bY_Vr7RG1n-lqiRLFZgh0uXC0eVx90-RvsVIXmyNRvVKeUggMhE3OE1dSsxcN1Mr_U6bBuk1-ISXL3M0qkNXL9IAR3r8xQYeyzrGhRsbGRGgsW3QYkGOGHFlhNiumYYCryArAmOZoxNhW2Jeq6qnOcWJiidfk6KM2BmwUYKlAThGl26Y8N5nzTx8xjxljrEuEZzAp7d-cM")',
-              }}
-              aria-hidden
-            />
+            
 
             <div className="flex flex-col p-5 gap-4">
               <div>
@@ -396,47 +374,59 @@ export default function ClientTrack({ token }: { token: string }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            {/* Upload */}
-            <label
-              className={`flex flex-col items-center justify-center gap-2 font-extrabold py-4 rounded-2xl shadow-lg transition-all active:scale-[0.98] cursor-pointer ${
-                uploadSuccess ? "bg-emerald-500 text-white" : "bg-[#e77e23] hover:bg-[#e77e23]/90 text-white"
-              }`}
-            >
-              {uploading ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : uploadSuccess ? (
-                <CheckCircle2 size={20} />
-              ) : (
-                <FileUp size={20} />
-              )}
-              <span className="text-sm">
-                {uploading ? "Envoi..." : uploadSuccess ? "Document reçu !" : "Ajouter un document"}
-              </span>
-              <input type="file" className="hidden" onChange={handleUpload} disabled={uploading} />
-            </label>
+          <div className="flex items-center gap-4">
+  {/* Bouton principal upload */}
+  <label
+    className={`flex-1 flex items-center justify-center gap-2 font-extrabold py-4 rounded-2xl shadow-lg transition-all active:scale-[0.98] cursor-pointer ${
+      uploadSuccess
+        ? "bg-emerald-500 text-white"
+        : "bg-[#e77e23] hover:bg-[#e77e23]/90 text-white"
+    }`}
+  >
+    {uploading ? (
+      <Loader2 className="h-5 w-5 animate-spin" />
+    ) : uploadSuccess ? (
+      <CheckCircle2 size={20} />
+    ) : (
+      <FileUp size={20} />
+    )}
 
-            {/* Contact (tel sinon mail) */}
-            {phoneHref ? (
-              <a
-                href={phoneHref}
-                className="flex flex-col items-center justify-center gap-2 bg-[#e77e23] hover:bg-[#e77e23]/90 text-white font-extrabold py-4 rounded-2xl shadow-lg transition-all active:scale-[0.98]"
-              >
-                <Phone size={20} />
-                <span className="text-sm">Par téléphone</span>
-              </a>
-            ) : (
-              <a
-                href={`mailto:${project.broker_email}?subject=${encodeURIComponent(
-                  `Question sur mon dossier ${project.client_name}`
-                )}`}
-                className="flex flex-col items-center justify-center gap-2 bg-[#e77e23] hover:bg-[#e77e23]/90 text-white font-extrabold py-4 rounded-2xl shadow-lg transition-all active:scale-[0.98]"
-              >
-                <MessageCircle size={20} />
-                <span className="text-sm">Par mail</span>
-              </a>
-            )}
-          </div>
+    <span className="text-sm">
+      {uploading
+        ? "Envoi..."
+        : uploadSuccess
+        ? "Document reçu !"
+        : "Ajouter un document"}
+    </span>
+
+    <input
+      type="file"
+      className="hidden"
+      onChange={handleUpload}
+      disabled={uploading}
+    />
+  </label>
+
+  {/* Bulle téléphone */}
+  {phoneHref && (
+    <a
+      href={phoneHref}
+      className="flex size-14 items-center justify-center rounded-full bg-white border border-[#e77e23]/20 shadow-sm hover:bg-[#e77e23]/10 transition"
+    >
+      <Phone className="size-5 text-[#e77e23]" />
+    </a>
+  )}
+
+  {/* Bulle mail */}
+  <a
+    href={`mailto:${project.broker_email}?subject=${encodeURIComponent(
+      `Question sur mon dossier ${project.client_name}`
+    )}`}
+    className="flex size-14 items-center justify-center rounded-full bg-white border border-[#e77e23]/20 shadow-sm hover:bg-[#e77e23]/10 transition"
+  >
+    <MessageCircle className="size-5 text-[#e77e23]" />
+  </a>
+</div>
         </section>
       </main>
 
