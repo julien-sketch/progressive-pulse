@@ -1,4 +1,7 @@
+import Image from "next/image";
+
 export default function HomePage() {
+
   return (
     <main className="min-h-screen bg-[#f8f7f6] text-slate-900">
       {/* Top bar */}
@@ -26,137 +29,61 @@ export default function HomePage() {
       </header>
 
       {/* HERO */}
-      <section className="px-6 pt-16 pb-10">
-        <div className="mx-auto max-w-6xl">
-          <div className="grid grid-cols-1 gap-10 md:grid-cols-[1.05fr_.95fr] md:items-center">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#e77e23]/15 bg-white px-4 py-2">
-                <span className="size-2 rounded-full bg-[#e77e23]" />
-                <span className="text-xs font-extrabold uppercase tracking-wider text-slate-600">
-                  Transparence client instantanée
-                </span>
-              </div>
+      <section className="min-h-screen flex items-center justify-center px-6 bg-[#f8f7f6]">
+  <div className="max-w-4xl text-center">
 
-              <h1 className="mt-6 text-4xl font-extrabold tracking-tight leading-tight md:text-5xl">
-                Offrez une{" "}
-                <span className="text-[#e77e23]">visibilité totale</span> à vos clients.
-              </h1>
+    <div className="inline-flex items-center gap-2 rounded-full border border-[#e77e23]/15 bg-white px-4 py-2">
+      <span className="size-2 rounded-full bg-[#e77e23]" />
+      <span className="text-xs font-extrabold uppercase tracking-wider text-slate-600">
+        Transparence client instantanée
+      </span>
+    </div>
 
-              <p className="mt-5 max-w-xl text-lg font-semibold text-slate-600">
-                Moins de relances. Moins d’appels. Plus de confiance.
-                Progressive Pulse transforme chaque dossier en expérience pro.
-              </p>
+    <h1 className="mt-8 text-5xl md:text-6xl font-extrabold tracking-tight leading-tight">
+      Offrez une{" "}
+      <span className="text-[#e77e23]">visibilité totale</span> à vos clients.
+    </h1>
 
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <a
-                  href="/demo"
-                  className="inline-flex items-center justify-center rounded-2xl bg-[#e77e23] px-7 py-4 text-sm font-extrabold text-white hover:bg-[#e77e23]/90 transition"
-                >
-                  Démo
-                </a>
+    <p className="mt-8 text-xl font-semibold text-slate-600">
+      Moins de relances. Moins d’appels. Plus de confiance.
+      Progressive Pulse transforme chaque dossier en expérience pro.
+    </p>
 
-                <a
-                  href="#tarifs"
-                  className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-7 py-4 text-sm font-extrabold text-slate-800 hover:bg-slate-50 transition"
-                >
-                  Voir les tarifs
-                </a>
-              </div>
+    <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:justify-center">
+      <a
+        href="/demo"
+        className="rounded-2xl bg-[#e77e23] px-10 py-5 text-base font-extrabold text-white hover:bg-[#e77e23]/90 transition"
+      >
+        Démo
+      </a>
 
-              {/* Social proof */}
-              <div className="mt-7 flex flex-wrap items-center gap-4">
-                <div className="flex -space-x-2">
-                  {["A", "M", "L", "S"].map((c) => (
-                    <div
-                      key={c}
-                      className="flex size-8 items-center justify-center rounded-full border-2 border-[#f8f7f6] bg-white text-xs font-extrabold text-slate-700 shadow-sm"
-                    >
-                      {c}
-                    </div>
-                  ))}
-                </div>
-                <div className="text-sm font-extrabold text-slate-700">
-                  +50 pros utilisent Progressive Pulse
-                </div>
-                
-              </div>
-            </div>
+      <a
+        href="#tarifs"
+        className="rounded-2xl border border-slate-200 bg-white px-10 py-5 text-base font-extrabold text-slate-800 hover:bg-slate-50 transition"
+      >
+        Voir les tarifs
+      </a>
+    </div>
 
-            {/* Mockup card */}
-            <div className="rounded-3xl border border-[#e77e23]/10 bg-white p-6 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
-                  Exemple dossier client
-                </div>
-                <div className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-extrabold text-emerald-700">
-                  En cours
-                </div>
-              </div>
-
-              <div className="mt-5 rounded-2xl border border-slate-200 bg-[#f8f7f6] p-4">
-                <div className="flex items-center justify-between">
-                  <div className="font-extrabold">Référence #FR-992834-X</div>
-                  <div className="text-sm font-extrabold text-[#e77e23]">65%</div>
-                </div>
-                <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-white">
-                  <div className="h-full w-[65%] rounded-full bg-[#e77e23]" />
-                </div>
-                <div className="mt-3 text-sm font-semibold text-slate-600">
-                  Statut : <span className="font-extrabold">Analyse en cours</span>
-                </div>
-
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <div className="rounded-xl bg-white p-3">
-                    <div className="text-xs font-extrabold text-slate-400">Étape</div>
-                    <div className="mt-1 text-sm font-extrabold">3 / 4</div>
-                  </div>
-                  <div className="rounded-xl bg-white p-3">
-                    <div className="text-xs font-extrabold text-slate-400">Mise à jour</div>
-                    <div className="mt-1 text-sm font-extrabold">il y a 2h</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-5 grid grid-cols-3 gap-3">
-                {[
-                  { t: "Reçu", ok: true },
-                  { t: "Vérif.", ok: true },
-                  { t: "Analyse", ok: true },
-                ].map((x) => (
-                  <div
-                    key={x.t}
-                    className="rounded-2xl border border-slate-200 bg-white p-3 text-center"
-                  >
-                    <div className="text-xs font-extrabold text-slate-500">{x.t}</div>
-                    <div className="mt-1 text-xs font-extrabold text-emerald-700">OK</div>
-                  </div>
-                ))}
-              </div>
-
-              <p className="mt-5 text-sm font-semibold text-slate-500">
-                Le client suit l’avancement sans t’appeler.
-              </p>
-            </div>
+    <div className="mt-10 flex items-center justify-center gap-4">
+      <div className="flex -space-x-2">
+        {["A", "M", "L", "S"].map((c) => (
+          <div
+            key={c}
+            className="flex size-9 items-center justify-center rounded-full border-2 border-[#f8f7f6] bg-white text-sm font-extrabold text-slate-700 shadow-sm"
+          >
+            {c}
           </div>
+        ))}
+      </div>
 
-          {/* Logos */}
-          <div className="mt-12 border-t border-[#e77e23]/10 pt-10">
-            <div className="text-center text-xs font-extrabold uppercase tracking-widest text-slate-400">
-              Utilisé par des professionnels (courtiers, immo, OF, freelances…)
-            </div>
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-              {["Courtier", "Immobilier", "Organisme de formation", "Artisan", "Freelance", "Agence"].map((l) => (
-                <div
-                  key={l}
-                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-extrabold text-slate-600"
-                >
-                  {l}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
+      <div className="text-base font-extrabold text-slate-700">
+        +50 pros utilisent Progressive Pulse
+      </div>
+    </div>
+
+  </div>
+</section>
 
       {/* BENEFITS */}
       <section id="benefices" className="bg-white px-6 py-16">
@@ -213,10 +140,15 @@ export default function HomePage() {
             <div className="text-xs font-extrabold uppercase tracking-widest text-slate-400">
               Aperçu interface
             </div>
-            <div className="mt-5 h-64 w-full rounded-2xl bg-gradient-to-br from-slate-100 to-slate-50 border border-slate-200 flex items-center justify-center">
-              <div className="text-sm font-extrabold text-slate-500">
-                (capture produit à ajouter)
-              </div>
+           
+            <div className="mt-5 mx-auto max-w-[420px] rounded-2xl overflow-hidden border border-slate-200">
+              <Image
+                src="/images/mockup-demo.png"
+                alt="Interface Progressive Pulse"
+                width={600}
+                height={900}
+                className="w-full h-auto"
+              />
             </div>
             <p className="mt-5 text-sm font-semibold text-slate-600">
               Ta page client ressemble à une app. Simple. Pro. Lisible.

@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 import { ArrowLeft } from "lucide-react";
 
-type Mode = "password" | "magic" | "signup";
+type Mode = "password" | "signup";
 
 const PROFESSION_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "courtier", label: "Courtier" },
@@ -23,23 +23,19 @@ export default function LoginPage() {
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
+  // password login
   const [password, setPassword] = useState("");
   const [loadingPwd, setLoadingPwd] = useState(false);
 
-  const [loadingMagic, setLoadingMagic] = useState(false);
-  const [cooldown, setCooldown] = useState(0);
+  // forgot password
+  const [resetLoading, setResetLoading] = useState(false);
 
+  // signup fields
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
   const [profession, setProfession] = useState("courtier");
   const [loadingSignup, setLoadingSignup] = useState(false);
-
-  useEffect(() => {
-    if (cooldown <= 0) return;
-    const t = setInterval(() => setCooldown((c) => Math.max(0, c - 1)), 1000);
-    return () => clearInterval(t);
-  }, [cooldown]);
 
   const loginPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,30 +57,32 @@ export default function LoginPage() {
     window.location.href = "/pro";
   };
 
-  const sendMagicLink = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleForgotPassword = async () => {
+    const eEmail = email.trim();
+    if (!eEmail) {
+      setErr("Renseigne ton email pour recevoir le lien.");
+      setInfo(null);
+      return;
+    }
+
     setErr(null);
     setInfo(null);
+    setResetLoading(true);
 
-    if (cooldown > 0) return;
-
-    setLoadingMagic(true);
     const origin = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
 
-    const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
-      options: { emailRedirectTo: `${origin}/auth/callback` },
+    const { error } = await supabase.auth.resetPasswordForEmail(eEmail, {
+      redirectTo: `${origin}/auth/callback`,
     });
 
-    setLoadingMagic(false);
+    setResetLoading(false);
 
     if (error) {
       setErr(error.message);
       return;
     }
 
-    setInfo("Lien envoyé. Vérifie ta boîte mail (et le spam).");
-    setCooldown(60);
+    setInfo("Email de réinitialisation envoyé. Vérifie ta boîte mail (et le spam).");
   };
 
   const signup = async (e: React.FormEvent) => {
@@ -114,6 +112,7 @@ export default function LoginPage() {
       return;
     }
 
+    // Si confirmation OFF, on peut être déjà connecté / sinon on tente un login
     let userId = signUpData.user?.id ?? null;
 
     const { data: sessionData } = await supabase.auth.getSession();
@@ -132,6 +131,7 @@ export default function LoginPage() {
       }
     }
 
+    // On met à jour le profil uniquement si on a une session active
     const { data: sessionData3 } = await supabase.auth.getSession();
     const finalUser = sessionData3.session?.user ?? null;
 
@@ -159,6 +159,7 @@ export default function LoginPage() {
       return;
     }
 
+    // Pas de session => confirmation email ON
     setLoadingSignup(false);
     setInfo("Compte créé. Confirme ton email pour activer l’accès, puis reconnecte-toi.");
   };
@@ -176,7 +177,9 @@ export default function LoginPage() {
           >
             <ArrowLeft className="size-5" />
           </button>
-          <div className="flex-1 text-center font-extrabold tracking-tight">Connexion Pro</div>
+          <div className="flex-1 text-center font-extrabold tracking-tight">
+            {mode === "signup" ? "Créer un compte Pro" : "Connexion Pro"}
+          </div>
           <div className="w-10" />
         </div>
       </div>
@@ -195,7 +198,8 @@ export default function LoginPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-3 gap-2 rounded-2xl bg-[#f8f7f6] p-2 border border-[#e77e23]/10">
+          {/* Tabs (magic link supprimé) */}
+          <div className="grid grid-cols-2 gap-2 rounded-2xl bg-[#f8f7f6] p-2 border border-[#e77e23]/10">
             <button
               type="button"
               onClick={() => setMode("password")}
@@ -204,15 +208,6 @@ export default function LoginPage() {
               }`}
             >
               Mot de passe
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("magic")}
-              className={`rounded-xl px-3 py-2 text-sm font-extrabold transition ${
-                mode === "magic" ? "bg-[#e77e23] text-white" : "bg-transparent text-slate-700 hover:bg-white"
-              }`}
-            >
-              Magic link
             </button>
             <button
               type="button"
@@ -324,9 +319,22 @@ export default function LoginPage() {
           {mode === "password" && (
             <form onSubmit={loginPassword} className="mt-4 space-y-4">
               <div>
-                <label className="mb-2 block text-xs font-extrabold uppercase tracking-widest text-slate-400">
-                  Mot de passe
-                </label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-extrabold uppercase tracking-widest text-slate-400">
+                    Mot de passe
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={handleForgotPassword}
+                    disabled={resetLoading}
+                    className="text-xs font-extrabold text-[#e77e23] hover:underline disabled:opacity-60"
+                    title="Recevoir un lien de réinitialisation"
+                  >
+                    {resetLoading ? "Envoi..." : "Mot de passe oublié ?"}
+                  </button>
+                </div>
+
                 <input
                   required
                   type="password"
@@ -343,18 +351,6 @@ export default function LoginPage() {
                 className="w-full rounded-2xl bg-[#e77e23] p-4 font-extrabold text-white hover:bg-[#e77e23]/90 transition disabled:opacity-50"
               >
                 {loadingPwd ? "Connexion..." : "Se connecter"}
-              </button>
-            </form>
-          )}
-
-          {mode === "magic" && (
-            <form onSubmit={sendMagicLink} className="mt-4 space-y-4">
-              <button
-                type="submit"
-                disabled={loadingMagic || cooldown > 0}
-                className="w-full rounded-2xl bg-[#e77e23] p-4 font-extrabold text-white hover:bg-[#e77e23]/90 transition disabled:opacity-50"
-              >
-                {loadingMagic ? "Envoi..." : cooldown > 0 ? `Réessayer dans ${cooldown}s` : "Envoyer le lien"}
               </button>
             </form>
           )}
