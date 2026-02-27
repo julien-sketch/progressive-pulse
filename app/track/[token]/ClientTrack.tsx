@@ -439,14 +439,13 @@ export default function ClientTrack({ token }: { token: string }) {
             <span className="text-[10px] font-semibold leading-none">Messages</span>
           </a>
 
-          <button
-            type="button"
+          <a
+            href={`tel:${brokerPhone?.replace(/\s/g, "")}`}
             className="flex flex-1 flex-col items-center justify-center gap-1 text-slate-400 py-1"
-            onClick={() => alert("Profil client")}
           >
             <Phone className="size-5" />
-            <span className="text-[10px] font-semibold leading-none">Profil</span>
-          </button>
+            <span className="text-[10px] font-semibold leading-none">Appeler</span>
+          </a>
         </div>
       </nav>
     </div>
