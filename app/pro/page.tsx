@@ -133,7 +133,7 @@ export default function ProPage() {
 
   // create dossier
   const [clientName, setClientName] = useState<string>("");
-  const [projectTitle, setProjectTitle] = useState<string>(""); // facultatif
+  const [projectTitle, setProjectTitle] = useState<string>("");
   const [creating, setCreating] = useState(false);
 
   const [updatingProjectId, setUpdatingProjectId] = useState<string | null>(null);
@@ -364,7 +364,13 @@ export default function ProPage() {
   };
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Chargement...</div>;
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
+        <div className="rounded-2xl border border-[#E2E8F0] bg-white px-6 py-4 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+          <div className="text-sm font-semibold text-slate-600">Chargement…</div>
+        </div>
+      </div>
+    );
   }
 
   const metierLabel =
@@ -372,13 +378,20 @@ export default function ProPage() {
     normalizeType(profile?.profession);
 
   return (
-    <div className="min-h-screen bg-[#f8f7f6] px-6 py-8 text-slate-900">
+    <div className="min-h-screen bg-[#F8FAFC] px-6 py-8 text-slate-900">
+      {/* subtle background glow */}
+      <div aria-hidden className="fixed inset-0 -z-10">
+        <div className="absolute inset-0 bg-[#F8FAFC]" />
+        <div className="absolute -top-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full blur-3xl opacity-30 bg-[radial-gradient(circle,rgba(79,70,229,0.18),transparent_60%)]" />
+        <div className="absolute top-24 -left-44 h-[420px] w-[420px] rounded-full blur-3xl opacity-20 bg-[radial-gradient(circle,rgba(13,148,136,0.12),transparent_60%)]" />
+      </div>
+
       <div className="max-w-7xl mx-auto">
         {/* HEADER */}
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="inline-block px-2 py-1 rounded-md bg-[#e77e23]/10 text-[#e77e23] text-xs font-extrabold uppercase tracking-wider">
-              Pro-Pulse
+            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-700 text-xs font-extrabold uppercase tracking-wider ring-1 ring-indigo-100">
+              Progressive Pulse
             </div>
             <h1 className="mt-3 text-4xl font-extrabold tracking-tight">Dashboard Pro</h1>
             <p className="text-sm text-slate-500 mt-1 font-semibold">Connecté : {userEmail}</p>
@@ -386,23 +399,22 @@ export default function ProPage() {
 
           <button
             onClick={logout}
-            className="rounded-2xl bg-[#e77e23] text-white px-6 py-3 font-extrabold hover:bg-[#e77e23]/90 transition"
+            className="rounded-2xl bg-slate-900 text-white px-6 py-3 font-extrabold hover:bg-slate-800 transition"
           >
             Déconnexion
           </button>
         </div>
 
-        {/* LAYOUT: Main cards (2) + Sidebar small */}
         <div className="mt-8 grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
           {/* MAIN */}
           <div className="space-y-6">
-            {/* MAIN CARD 1: Nombre de dossiers */}
-            <div className="rounded-3xl border border-[#e77e23]/10 bg-white shadow-sm p-8">
+            {/* CARD: Nombre de dossiers */}
+            <div className="rounded-3xl border border-[#E2E8F0] bg-white shadow-[0_20px_60px_rgba(15,23,42,0.06)] p-8">
               <div className="flex items-center justify-between">
                 <div className="text-xs font-extrabold tracking-widest text-slate-400">DOSSIERS</div>
                 <button
                   onClick={loadAll}
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-extrabold hover:bg-slate-50 transition"
+                  className="rounded-2xl border border-[#E2E8F0] bg-white px-4 py-2 text-sm font-extrabold hover:bg-slate-50 transition"
                 >
                   Rafraîchir
                 </button>
@@ -420,11 +432,9 @@ export default function ProPage() {
               )}
             </div>
 
-            {/* MAIN CARD 2: Création de dossier */}
-            <div className="rounded-3xl border border-[#e77e23]/10 bg-white shadow-sm p-8">
-              <div className="text-xs font-extrabold tracking-widest text-slate-400">
-                CRÉER UN DOSSIER
-              </div>
+            {/* CARD: Création de dossier */}
+            <div className="rounded-3xl border border-[#E2E8F0] bg-white shadow-[0_20px_60px_rgba(15,23,42,0.06)] p-8">
+              <div className="text-xs font-extrabold tracking-widest text-slate-400">CRÉER UN DOSSIER</div>
 
               <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -433,7 +443,8 @@ export default function ProPage() {
                     value={clientName}
                     onChange={(e) => setClientName(e.target.value)}
                     placeholder="ex: Mr ou Mme X"
-                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-semibold outline-none focus:border-[#e77e23] transition"
+                    className="mt-2 w-full rounded-2xl border border-[#E2E8F0] bg-white px-4 py-3 font-semibold outline-none transition-all
+                               focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100"
                   />
                 </div>
 
@@ -445,7 +456,8 @@ export default function ProPage() {
                     value={projectTitle}
                     onChange={(e) => setProjectTitle(e.target.value)}
                     placeholder="ex: Achat résidence principale"
-                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-semibold outline-none focus:border-[#e77e23] transition"
+                    className="mt-2 w-full rounded-2xl border border-[#E2E8F0] bg-white px-4 py-3 font-semibold outline-none transition-all
+                               focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100"
                   />
                 </div>
               </div>
@@ -453,7 +465,11 @@ export default function ProPage() {
               <button
                 onClick={createDossier}
                 disabled={creating || !profileOk}
-                className="mt-5 w-full rounded-2xl bg-[#e77e23] text-white px-6 py-4 font-extrabold hover:bg-[#e77e23]/90 transition disabled:opacity-40"
+                className="mt-5 w-full rounded-2xl px-6 py-4 font-extrabold text-white transition disabled:opacity-40
+                           bg-[linear-gradient(135deg,#4F46E5_0%,#6366F1_60%,#7C3AED_100%)]
+                           shadow-[0_12px_28px_rgba(79,70,229,0.22)]
+                           hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(79,70,229,0.28)]
+                           active:translate-y-[1px]"
                 title={!profileOk ? "Complète ton profil d'abord" : ""}
               >
                 {creating ? "Création..." : "Créer (1 crédit)"}
@@ -464,8 +480,8 @@ export default function ProPage() {
               </p>
             </div>
 
-            {/* LISTE DOSSIERS (inchangée en logique) */}
-            <div className="rounded-3xl border border-[#e77e23]/10 bg-white shadow-sm p-8">
+            {/* LISTE DOSSIERS */}
+            <div className="rounded-3xl border border-[#E2E8F0] bg-white shadow-[0_20px_60px_rgba(15,23,42,0.06)] p-8">
               <div className="flex items-center justify-between">
                 <div className="text-xs font-extrabold tracking-widest text-slate-400">LISTE DES DOSSIERS</div>
                 <div className="text-sm font-extrabold text-slate-500">{projects.length}</div>
@@ -489,7 +505,7 @@ export default function ProPage() {
                     isFinished ? "Terminé" : idxCurrent >= 0 ? stepsDef[idxCurrent]?.label : statusText || "—";
 
                   return (
-                    <div key={p.id} className="rounded-3xl border border-slate-200 bg-white p-6">
+                    <div key={p.id} className="rounded-3xl border border-[#E2E8F0] bg-white p-6">
                       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
@@ -499,7 +515,7 @@ export default function ProPage() {
                             )}
                             <div className="text-xs font-extrabold tracking-widest text-slate-400">• {t.toUpperCase()}</div>
 
-                            <span className="inline-flex items-center rounded-full bg-[#e77e23]/10 px-3 py-1 text-xs font-extrabold text-[#e77e23]">
+                            <span className="inline-flex items-center rounded-full bg-indigo-50 px-3 py-1 text-xs font-extrabold text-indigo-700 ring-1 ring-indigo-100">
                               Étape en cours : {currentLabel}
                             </span>
                           </div>
@@ -522,7 +538,7 @@ export default function ProPage() {
                         <div className="flex items-center gap-3">
                           <button
                             onClick={() => copyLink(p.access_token)}
-                            className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-extrabold hover:bg-slate-50 transition"
+                            className="rounded-2xl border border-[#E2E8F0] bg-white px-4 py-2 text-sm font-extrabold hover:bg-slate-50 transition"
                           >
                             Copier lien
                           </button>
@@ -531,7 +547,7 @@ export default function ProPage() {
                             href={`/track/${p.access_token}`}
                             target="_blank"
                             rel="noreferrer"
-                            className="rounded-2xl bg-[#e77e23] text-white px-4 py-2 text-sm font-extrabold hover:bg-[#e77e23]/90 transition"
+                            className="rounded-2xl bg-slate-900 text-white px-4 py-2 text-sm font-extrabold hover:bg-slate-800 transition"
                           >
                             Ouvrir
                           </a>
@@ -546,7 +562,7 @@ export default function ProPage() {
                         </div>
                       </div>
 
-                      {/* étapes */}
+                      {/* Steps */}
                       <div className="mt-5 flex flex-wrap gap-2">
                         {stepsDef.map((s, idx) => {
                           const stepIndex1 = idx + 1;
@@ -558,10 +574,10 @@ export default function ProPage() {
                           const disabled = !canUpdate || isBusy || isDeleting ? "opacity-50" : "";
 
                           const cls = isCurrent
-                            ? `${base} bg-[#e77e23] text-white border-[#e77e23]`
+                            ? `${base} bg-indigo-600 text-white border-indigo-600`
                             : completed
                             ? `${base} bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100`
-                            : `${base} bg-white text-slate-700 border-slate-200 hover:bg-slate-50`;
+                            : `${base} bg-white text-slate-700 border-[#E2E8F0] hover:bg-slate-50`;
 
                           return (
                             <button
@@ -587,10 +603,10 @@ export default function ProPage() {
             </div>
           </div>
 
-          {/* SIDEBAR (profil petit + crédits) */}
+          {/* SIDEBAR */}
           <aside className="space-y-6">
-            {/* Profil (petit) */}
-            <div className="rounded-3xl border border-[#e77e23]/10 bg-white shadow-sm p-6">
+            {/* Profil */}
+            <div className="rounded-3xl border border-[#E2E8F0] bg-white shadow-[0_20px_60px_rgba(15,23,42,0.06)] p-6">
               <div className="text-xs font-extrabold tracking-widest text-slate-400">PROFIL</div>
               <p className="mt-2 text-sm text-slate-600 font-semibold">
                 Métier : {profileLoading ? "…" : metierLabel || "—"} <br />
@@ -603,7 +619,8 @@ export default function ProPage() {
                   <select
                     value={professionDraft}
                     onChange={(e) => setProfessionDraft(e.target.value)}
-                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-semibold outline-none focus:border-[#e77e23] transition"
+                    className="mt-2 w-full rounded-2xl border border-[#E2E8F0] bg-white px-4 py-3 font-semibold outline-none transition-all
+                               focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100"
                   >
                     {PROFESSION_OPTIONS.map((o) => (
                       <option key={o.value} value={o.value}>
@@ -619,22 +636,24 @@ export default function ProPage() {
                     value={phoneDraft}
                     onChange={(e) => setPhoneDraft(e.target.value)}
                     placeholder="ex: 06 12 34 56 78"
-                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-semibold outline-none focus:border-[#e77e23] transition"
+                    className="mt-2 w-full rounded-2xl border border-[#E2E8F0] bg-white px-4 py-3 font-semibold outline-none transition-all
+                               focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100"
                   />
                 </div>
 
                 <button
                   onClick={saveProfile}
                   disabled={savingProfile}
-                  className="w-full rounded-2xl bg-[#e77e23] text-white px-6 py-3 font-extrabold hover:bg-[#e77e23]/90 transition disabled:opacity-50"
+                  className="w-full rounded-2xl px-6 py-3 font-extrabold text-white transition disabled:opacity-50
+                             bg-slate-900 hover:bg-slate-800"
                 >
                   {savingProfile ? "Sauvegarde..." : "Enregistrer"}
                 </button>
               </div>
             </div>
 
-            {/* Crédits (secondaire) */}
-            <div className="rounded-3xl border border-[#e77e23]/10 bg-white shadow-sm p-6">
+            {/* Crédits */}
+            <div className="rounded-3xl border border-[#E2E8F0] bg-white shadow-[0_20px_60px_rgba(15,23,42,0.06)] p-6">
               <div className="text-xs font-extrabold tracking-widest text-slate-400">CRÉDITS</div>
 
               <div className="mt-3 flex items-end gap-3">
@@ -647,7 +666,7 @@ export default function ProPage() {
                   href={stripeCheckoutUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex w-full items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-extrabold hover:bg-slate-50 transition"
+                  className="inline-flex w-full items-center justify-center rounded-2xl border border-[#E2E8F0] bg-white px-4 py-3 text-sm font-extrabold hover:bg-slate-50 transition"
                 >
                   Acheter
                 </a>

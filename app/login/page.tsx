@@ -165,14 +165,21 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8f7f6] text-slate-900">
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-900">
+      {/* subtle background glow */}
+      <div aria-hidden className="fixed inset-0 -z-10">
+        <div className="absolute inset-0 bg-[#F8FAFC]" />
+        <div className="absolute -top-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full blur-3xl opacity-30 bg-[radial-gradient(circle,rgba(79,70,229,0.18),transparent_60%)]" />
+        <div className="absolute top-32 -left-40 h-[420px] w-[420px] rounded-full blur-3xl opacity-20 bg-[radial-gradient(circle,rgba(13,148,136,0.12),transparent_60%)]" />
+      </div>
+
       {/* header simple */}
-      <div className="sticky top-0 z-10 bg-[#f8f7f6]/80 backdrop-blur-md border-b border-[#e77e23]/10">
+      <div className="sticky top-0 z-10 bg-white/70 backdrop-blur-md border-b border-[#E2E8F0]">
         <div className="max-w-md mx-auto px-4 py-4 flex items-center gap-3">
           <button
             type="button"
             onClick={() => window.history.back()}
-            className="flex size-10 items-center justify-center rounded-full hover:bg-[#e77e23]/10 transition"
+            className="flex size-10 items-center justify-center rounded-full hover:bg-slate-100 transition"
             aria-label="Retour"
           >
             <ArrowLeft className="size-5" />
@@ -185,10 +192,10 @@ export default function LoginPage() {
       </div>
 
       <div className="px-6 pt-10 pb-12">
-        <div className="mx-auto max-w-md rounded-2xl bg-white p-6 shadow-sm border border-[#e77e23]/10">
+        <div className="mx-auto max-w-md rounded-3xl bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)] border border-[#E2E8F0]">
           <div className="mb-5">
-            <div className="inline-block px-2 py-1 rounded-md bg-[#e77e23]/10 text-[#e77e23] text-xs font-extrabold uppercase tracking-wider">
-              Pro-Pulse
+            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-700 text-xs font-extrabold uppercase tracking-wider ring-1 ring-indigo-100">
+              Progressive Pulse
             </div>
             <h1 className="mt-3 text-2xl font-extrabold tracking-tight">
               {mode === "signup" ? "Créer un compte Pro" : "Accès professionnel"}
@@ -198,13 +205,15 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {/* Tabs (magic link supprimé) */}
-          <div className="grid grid-cols-2 gap-2 rounded-2xl bg-[#f8f7f6] p-2 border border-[#e77e23]/10">
+          {/* Tabs */}
+          <div className="grid grid-cols-2 gap-2 rounded-2xl bg-[#F8FAFC] p-2 border border-[#E2E8F0]">
             <button
               type="button"
               onClick={() => setMode("password")}
               className={`rounded-xl px-3 py-2 text-sm font-extrabold transition ${
-                mode === "password" ? "bg-[#e77e23] text-white" : "bg-transparent text-slate-700 hover:bg-white"
+                mode === "password"
+                  ? "bg-slate-900 text-white shadow-sm"
+                  : "bg-transparent text-slate-700 hover:bg-white"
               }`}
             >
               Mot de passe
@@ -213,7 +222,9 @@ export default function LoginPage() {
               type="button"
               onClick={() => setMode("signup")}
               className={`rounded-xl px-3 py-2 text-sm font-extrabold transition ${
-                mode === "signup" ? "bg-[#e77e23] text-white" : "bg-transparent text-slate-700 hover:bg-white"
+                mode === "signup"
+                  ? "bg-slate-900 text-white shadow-sm"
+                  : "bg-transparent text-slate-700 hover:bg-white"
               }`}
             >
               Inscription
@@ -227,7 +238,8 @@ export default function LoginPage() {
             <input
               required
               type="email"
-              className="w-full rounded-2xl border border-slate-200 bg-white p-4 outline-none focus:border-[#e77e23] transition-all"
+              className="w-full rounded-2xl border border-[#E2E8F0] bg-white p-4 outline-none transition-all
+                         focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100"
               placeholder="ex: pro@agence.fr"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -243,7 +255,8 @@ export default function LoginPage() {
                   </label>
                   <input
                     required
-                    className="w-full rounded-2xl border border-slate-200 bg-white p-4 outline-none focus:border-[#e77e23] transition-all"
+                    className="w-full rounded-2xl border border-[#E2E8F0] bg-white p-4 outline-none transition-all
+                               focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100"
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
                   />
@@ -254,7 +267,8 @@ export default function LoginPage() {
                   </label>
                   <input
                     required
-                    className="w-full rounded-2xl border border-slate-200 bg-white p-4 outline-none focus:border-[#e77e23] transition-all"
+                    className="w-full rounded-2xl border border-[#E2E8F0] bg-white p-4 outline-none transition-all
+                               focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100"
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
                   />
@@ -268,7 +282,8 @@ export default function LoginPage() {
                 <input
                   required
                   type="tel"
-                  className="w-full rounded-2xl border border-slate-200 bg-white p-4 outline-none focus:border-[#e77e23] transition-all"
+                  className="w-full rounded-2xl border border-[#E2E8F0] bg-white p-4 outline-none transition-all
+                             focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100"
                   placeholder="ex: 06 12 34 56 78"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
@@ -282,7 +297,8 @@ export default function LoginPage() {
                 <select
                   value={profession}
                   onChange={(e) => setProfession(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white p-4 font-extrabold outline-none focus:border-[#e77e23] transition-all"
+                  className="w-full rounded-2xl border border-[#E2E8F0] bg-white p-4 font-extrabold outline-none transition-all
+                             focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100"
                 >
                   {PROFESSION_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>
@@ -299,7 +315,8 @@ export default function LoginPage() {
                 <input
                   required
                   type="password"
-                  className="w-full rounded-2xl border border-slate-200 bg-white p-4 outline-none focus:border-[#e77e23] transition-all"
+                  className="w-full rounded-2xl border border-[#E2E8F0] bg-white p-4 outline-none transition-all
+                             focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100"
                   placeholder="8 caractères minimum"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -309,7 +326,11 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loadingSignup}
-                className="w-full rounded-2xl bg-[#e77e23] p-4 font-extrabold text-white hover:bg-[#e77e23]/90 transition disabled:opacity-50"
+                className="w-full rounded-2xl p-4 font-extrabold text-white transition disabled:opacity-50
+                           bg-[linear-gradient(135deg,#4F46E5_0%,#6366F1_60%,#7C3AED_100%)]
+                           shadow-[0_12px_28px_rgba(79,70,229,0.22)]
+                           hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(79,70,229,0.28)]
+                           active:translate-y-[1px]"
               >
                 {loadingSignup ? "Création..." : "Créer mon compte"}
               </button>
@@ -328,7 +349,7 @@ export default function LoginPage() {
                     type="button"
                     onClick={handleForgotPassword}
                     disabled={resetLoading}
-                    className="text-xs font-extrabold text-[#e77e23] hover:underline disabled:opacity-60"
+                    className="text-xs font-extrabold text-indigo-700 hover:underline disabled:opacity-60"
                     title="Recevoir un lien de réinitialisation"
                   >
                     {resetLoading ? "Envoi..." : "Mot de passe oublié ?"}
@@ -338,7 +359,8 @@ export default function LoginPage() {
                 <input
                   required
                   type="password"
-                  className="w-full rounded-2xl border border-slate-200 bg-white p-4 outline-none focus:border-[#e77e23] transition-all"
+                  className="w-full rounded-2xl border border-[#E2E8F0] bg-white p-4 outline-none transition-all
+                             focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -348,10 +370,15 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loadingPwd}
-                className="w-full rounded-2xl bg-[#e77e23] p-4 font-extrabold text-white hover:bg-[#e77e23]/90 transition disabled:opacity-50"
+                className="w-full rounded-2xl p-4 font-extrabold text-white transition disabled:opacity-50
+                           bg-slate-900 hover:bg-slate-800"
               >
                 {loadingPwd ? "Connexion..." : "Se connecter"}
               </button>
+
+              <div className="text-xs font-semibold text-slate-500 text-center">
+                Astuce : utilise le bouton “Essayer” sur la landing pour aller plus vite.
+              </div>
             </form>
           )}
 
@@ -369,7 +396,7 @@ export default function LoginPage() {
         </div>
 
         <p className="mt-8 text-center text-[10px] font-extrabold uppercase tracking-[0.3em] text-slate-300">
-          Propulsé par Pro-Pulse
+          Propulsé par Progressive Pulse
         </p>
       </div>
     </div>
