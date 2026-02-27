@@ -139,9 +139,13 @@ export default function ProPage() {
   const [updatingProjectId, setUpdatingProjectId] = useState<string | null>(null);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
 
-  const stripeCheckoutUrl = `https://buy.stripe.com/eVq8wQ3kJ7vWc2x58veIw00?prefilled_email=${encodeURIComponent(
-    userEmail || ""
-  )}`;
+  const stripeCheckoutPack10 = `https://buy.stripe.com/9B6fZi7AZ2bC0jPfN9eIw01?prefilled_email=${encodeURIComponent(
+  userEmail || ""
+)}`;
+
+const stripeCheckoutSingle = `https://buy.stripe.com/bJe14o5sR7vWd6B9oLeIw02?prefilled_email=${encodeURIComponent(
+  userEmail || ""
+)}`;
 
   const loadAll = async () => {
     setLoading(true);
@@ -661,16 +665,30 @@ export default function ProPage() {
                 <div className="pb-2 text-slate-600 font-semibold">restants</div>
               </div>
 
-              <div className="mt-5 flex items-center gap-3">
-                <a
-                  href={stripeCheckoutUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex w-full items-center justify-center rounded-2xl border border-[#E2E8F0] bg-white px-4 py-3 text-sm font-extrabold hover:bg-slate-50 transition"
-                >
-                  Acheter
-                </a>
-              </div>
+              <div className="mt-5 grid grid-cols-1 gap-3">
+  <a
+    href={stripeCheckoutSingle}
+    target="_blank"
+    rel="noreferrer"
+    className="inline-flex w-full items-center justify-center rounded-2xl border border-[#E2E8F0] bg-white px-4 py-3 text-sm font-extrabold hover:bg-slate-50 transition"
+  >
+    Acheter 1 dossier — 49€
+  </a>
+
+  <a
+    href={stripeCheckoutPack10}
+    target="_blank"
+    rel="noreferrer"
+    className="inline-flex w-full items-center justify-center rounded-2xl px-4 py-3 text-sm font-extrabold text-white
+               bg-[linear-gradient(135deg,#4F46E5_0%,#6366F1_60%,#7C3AED_100%)]
+               shadow-[0_12px_28px_rgba(79,70,229,0.18)]
+               transition-all duration-200 ease-out
+               hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(79,70,229,0.24)]
+               active:translate-y-[1px]"
+  >
+    Acheter pack 10 dossiers — 290€
+  </a>
+</div>
             </div>
           </aside>
         </div>
