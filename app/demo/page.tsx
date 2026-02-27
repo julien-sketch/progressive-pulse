@@ -1,280 +1,459 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Mail, Phone, Check, Hourglass, Lock, FileUp } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { getSupabaseBrowser } from "@/lib/supabase-browser";
+import {
+  FileUp,
+  MessageCircle,
+  CheckCircle2,
+  Loader2,
+  Phone,
+  Check,
+  Hourglass,
+  Lock,
+  Home,
+} from "lucide-react";
 
-type Step = {
-  id: number;
-  label: string;
-  desc?: string;
-  percent: number;
+type Project = {
+  client_name: string;
+  progress_percent: number;
+  status_text: string;
+  created_at: string | null;
+  updated_at: string | null;
+  broker_email: string;
+  broker_phone: string | null;
+  drive_folder_url: string | null;
+  access_token: string;
+  project_type?: string | null;
 };
 
-const DEMO_STEPS: Step[] = [
-  { id: 1, label: "Documents reçus", desc: "Vos pièces ont bien été reçues.", percent: 0 },
-  { id: 2, label: "Dossier complet", desc: "Vérification des pièces en cours.", percent: 15 },
-  { id: 3, label: "Dépôt effectué", desc: "Dépôt réalisé auprès de l’organisme.", percent: 30 },
-  { id: 4, label: "En attente de validation", desc: "Contrôle et validation en cours.", percent: 45 },
-  { id: 5, label: "Demande acceptée", desc: "Votre demande a été acceptée.", percent: 65 },
-  { id: 6, label: "Fin de formation transmise", desc: "Les justificatifs de fin ont été envoyés.", percent: 80 },
-  { id: 7, label: "Remboursement en cours", desc: "Traitement du paiement en cours.", percent: 90 },
-  { id: 8, label: "Paiement validé", desc: "Paiement confirmé. Dossier terminé.", percent: 100 },
-];
+type Step = {
+  order_index: number;
+  label: string;
+  is_completed: boolean;
+};
 
-function clampPct(n: number) {
-  return Math.max(0, Math.min(100, Math.round(n)));
+type StatusDef = { label: string; percent: number };
+
+const STATUS_BY_TYPE: Record<string, StatusDef[]> = {
+  immo: [
+    { label: "Mandat non confirmé", percent: 0 },
+    { label: "Mandat signé", percent: 10 },
+    { label: "Documents reçus", percent: 25 },
+    { label: "Dossier complet", percent: 35 },
+    { label: "Visites en cours", percent: 50 },
+    { label: "Offre acceptée", percent: 70 },
+    { label: "Compromis signé", percent: 80 },
+    { label: "Délai de rétractation", percent: 88 },
+    { label: "Acte signé", percent: 100 },
+  ],
+  of: [
+    { label: "Documents reçus", percent: 0 },
+    { label: "Dossier complet", percent: 15 },
+    { label: "Dépôt effectué auprès du fonds de formation", percent: 30 },
+    { label: "En attente de validation", percent: 45 },
+    { label: "Demande acceptée", percent: 65 },
+    { label: "Documents de fin de formation transmis", percent: 80 },
+    { label: "Remboursement en cours", percent: 90 },
+    { label: "Paiement validé", percent: 100 },
+  ],
+  other: [
+    { label: "Documents reçus", percent: 0 },
+    { label: "Dossier complet", percent: 50 },
+    { label: "Terminé", percent: 100 },
+  ],
+};
+
+function clampPct(n: number | null | undefined) {
+  const v = typeof n === "number" ? n : 0;
+  return Math.max(0, Math.min(100, Math.round(v)));
 }
 
-export default function DemoPage() {
-  // Par défaut : étape 4 (ça donne “en cours”)
-  const [currentStepId, setCurrentStepId] = useState<number>(4);
+function normalizeType(t: string | null | undefined) {
+  const v = (t ?? "").toLowerCase().trim();
+  if (v === "immobilier") return "immo";
+  if (v === "formation") return "of";
+  if (v === "immo" || v === "of") return v;
+  return "other";
+}
 
-  const current = useMemo(() => {
-    return DEMO_STEPS.find((x) => x.id === currentStepId) ?? DEMO_STEPS[0];
-  }, [currentStepId]);
+function normalizePhone(phone: string) {
+  return phone.replace(/[^\d+]/g, "");
+}
 
-  const pct = clampPct(current.percent);
+function timeAgo(iso: string | null) {
+  if (!iso) return "—";
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const min = Math.max(0, Math.floor(diffMs / 60000));
+  if (min < 2) return "à l’instant";
+  if (min < 60) return `il y a ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `il y a ${h}h`;
+  const d = Math.floor(h / 24);
+  return `il y a ${d}j`;
+}
 
-  const completedCount = useMemo(() => DEMO_STEPS.filter((s) => s.id < currentStepId).length, [currentStepId]);
-  const totalCount = DEMO_STEPS.length;
+export default function ClientTrack({ token }: { token: string }) {
+  const supabase = useMemo(() => getSupabaseBrowser(), []);
+  void supabase;
 
-  const goPrev = () => setCurrentStepId((x) => Math.max(1, x - 1));
-  const goNext = () => setCurrentStepId((x) => Math.min(DEMO_STEPS.length, x + 1));
+  const [project, setProject] = useState<Project | null>(null);
+  const [steps, setSteps] = useState<Step[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
 
-  const isFinished = currentStepId === DEMO_STEPS.length;
+  const [uploading, setUploading] = useState(false);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+
+  useEffect(() => {
+    const run = async () => {
+      const cleanToken = String(token ?? "").trim();
+      const apiUrl = `/api/track/${encodeURIComponent(cleanToken)}`;
+
+      setLoading(true);
+      setNotFound(false);
+
+      if (!cleanToken) {
+        setNotFound(true);
+        setProject(null);
+        setSteps([]);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const res = await fetch(apiUrl, { cache: "no-store" });
+
+        if (res.status === 404) {
+          setNotFound(true);
+          setProject(null);
+          setSteps([]);
+          return;
+        }
+
+        const json = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          console.error("Track API error:", json);
+          setNotFound(true);
+          setProject(null);
+          setSteps([]);
+          return;
+        }
+
+        setProject(json.project as Project);
+        setSteps((json.steps as Step[]) ?? []);
+      } catch (err) {
+        console.error(err);
+        setNotFound(true);
+        setProject(null);
+        setSteps([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    run();
+  }, [token]);
+
+  const displaySteps: Step[] = useMemo(() => {
+    if (!project) return [];
+    if (steps && steps.length > 0) return steps;
+
+    const type = normalizeType(project.project_type);
+    const statuses = STATUS_BY_TYPE[type] ?? STATUS_BY_TYPE.other;
+
+    let currentIdx = statuses.findIndex((s) => s.label === (project.status_text ?? ""));
+    if (currentIdx < 0) {
+      const p = clampPct(project.progress_percent);
+      currentIdx = statuses.reduce((best, s, idx) => (s.percent <= p ? idx : best), 0);
+    }
+
+    return statuses.map((s, idx) => ({
+      order_index: idx + 1,
+      label: s.label,
+      is_completed: idx <= currentIdx,
+    }));
+  }, [project, steps]);
+
+  const completedCount = displaySteps.filter((s) => s.is_completed).length;
+  const totalCount = displaySteps.length || 0;
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !project) return;
+
+    setUploading(true);
+    setUploadSuccess(false);
+
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+
+      const res = await fetch(`/api/d/${encodeURIComponent(project.access_token)}/upload`, {
+        method: "POST",
+        body: fd,
+      });
+
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error ?? "Upload failed");
+
+      setUploadSuccess(true);
+      setTimeout(() => setUploadSuccess(false), 5000);
+    } catch (err: any) {
+      console.error("Upload error:", err);
+      alert(err?.message ?? "Erreur lors de l'envoi");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  const lastUpdate = project?.updated_at || project?.created_at || null;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center px-6">
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+        <p className="mt-4 text-sm font-semibold text-slate-500">Récupération de votre dossier…</p>
+      </div>
+    );
+  }
+
+  if (notFound || !project) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center px-6">
+        <div className="w-full max-w-md overflow-hidden rounded-3xl border border-[#E2E8F0] bg-white p-8 text-center shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Lien invalide</h1>
+          <p className="mt-3 text-sm font-semibold text-slate-500">
+            Ce dossier n’existe pas ou n’est plus accessible.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const pct = clampPct(project.progress_percent);
+
+  const phone = (project.broker_phone ?? "").trim();
+  const cleanPhone = phone ? normalizePhone(phone) : "";
+  const phoneHref = cleanPhone ? `tel:${encodeURIComponent(cleanPhone)}` : null;
+
+  const currentIndex =
+    displaySteps.findIndex((s) => !s.is_completed) === -1
+      ? Math.max(0, displaySteps.length - 1)
+      : Math.max(0, displaySteps.findIndex((s) => !s.is_completed) - 1);
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-900">
-      {/* Subtle background glow (même style que ta landing) */}
-      <div aria-hidden className="fixed inset-0 -z-10">
-        <div className="absolute inset-0 bg-[#F8FAFC]" />
-        <div className="absolute -top-40 left-1/2 h-[560px] w-[560px] -translate-x-1/2 rounded-full blur-3xl opacity-35 bg-[radial-gradient(circle,rgba(79,70,229,0.18),transparent_60%)]" />
-        <div className="absolute top-24 -left-44 h-[460px] w-[460px] rounded-full blur-3xl opacity-20 bg-[radial-gradient(circle,rgba(13,148,136,0.12),transparent_60%)]" />
-        <div className="absolute -bottom-60 right-[-120px] h-[560px] w-[560px] rounded-full blur-3xl opacity-20 bg-[radial-gradient(circle,rgba(124,58,237,0.12),transparent_60%)]" />
-      </div>
-
-      {/* Header */}
-      <header className="sticky top-0 z-20">
-        <div className="mx-auto max-w-2xl px-6 pt-4">
-          <div className="rounded-2xl border border-[#E2E8F0] bg-white/70 backdrop-blur-md shadow-[0_12px_40px_rgba(15,23,42,0.06)]">
-            <div className="px-5 py-4 text-center">
-              <div className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-white px-4 py-2 shadow-sm">
-                <span className="size-2 rounded-full bg-indigo-600" />
-                <span className="text-xs font-extrabold uppercase tracking-wider text-slate-600">
-                  Démo Progressive Pulse
-                </span>
-              </div>
-              <h1 className="mt-3 text-lg font-extrabold tracking-tight">Suivi de dossier</h1>
-              <p className="mt-1 text-sm font-semibold text-slate-500">
-                Clique sur une étape : statut + progression changent instantanément.
-              </p>
-            </div>
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 flex flex-col">
+      {/* Header sticky */}
+      <header className="border-b border-[#E2E8F0] bg-white/70 backdrop-blur-md">
+        <div className="max-w-2xl mx-auto px-4 py-6 text-center">
+          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-700 text-xs font-extrabold uppercase tracking-wider ring-1 ring-indigo-100">
+            Progressive Pulse
           </div>
+          <h1 className="mt-3 text-xl font-extrabold tracking-tight text-slate-900">Suivi de dossier</h1>
         </div>
       </header>
 
-      <main className="mx-auto max-w-2xl px-6 pb-24">
-        {/* Status card */}
-        <section className="mt-6 rounded-3xl border border-[#E2E8F0] bg-white shadow-[0_20px_60px_rgba(15,23,42,0.06)] overflow-hidden">
-          <div className="p-6">
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <span className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-extrabold text-indigo-700 ring-1 ring-indigo-100">
-                  {isFinished ? (
-                    <>
-                      <span className="size-2 rounded-full bg-emerald-500" />
-                      Terminé
-                    </>
-                  ) : (
-                    <>
-                      <span className="size-2 rounded-full bg-indigo-600" />
-                      En cours
-                    </>
-                  )}
+      <main className="flex-1 max-w-2xl mx-auto w-full pb-32">
+        {/* Status Card */}
+        <div className="p-4">
+          <div className="flex flex-col overflow-hidden rounded-3xl bg-white shadow-[0_20px_60px_rgba(15,23,42,0.06)] border border-[#E2E8F0]">
+            <div className="flex flex-col p-6 gap-5">
+              <div>
+                <span className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-700 text-xs font-extrabold uppercase tracking-wider ring-1 ring-indigo-100 mb-2">
+                  Statut actuel
                 </span>
-
-                <h2 className="mt-4 text-2xl font-extrabold tracking-tight text-slate-900">
-                  {current.label}
-                </h2>
-                <p className="mt-2 text-sm font-semibold text-slate-600">{current.desc}</p>
+                <h2 className="text-2xl font-extrabold text-slate-900">{project.status_text}</h2>
+                <p className="text-slate-500 text-sm mt-1">Suivi de dossier • {project.client_name}</p>
               </div>
 
-              <div className="text-right shrink-0">
-                <div className="text-xs font-extrabold uppercase tracking-widest text-slate-400">
-                  Progression
+              <div className="space-y-2">
+                <div className="flex justify-between items-end">
+                  <p className="text-sm font-semibold text-slate-700">Progression globale</p>
+                  <p className="text-indigo-700 text-sm font-extrabold tabular-nums">{pct}%</p>
                 </div>
-                <div className="mt-1 text-3xl font-extrabold text-indigo-700 tabular-nums">
-                  {pct}%
+
+                <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden ring-1 ring-[#E2E8F0]">
+                  <div
+                    className="h-full rounded-full transition-all duration-700 ease-out
+                               bg-[linear-gradient(135deg,#4F46E5_0%,#6366F1_60%,#7C3AED_100%)]"
+                    style={{ width: `${pct}%` }}
+                  />
                 </div>
-                <div className="mt-1 text-xs font-semibold text-slate-500">
-                  Étape {currentStepId} / {totalCount}
-                </div>
+
+                <p className="text-slate-400 text-xs">
+                  Étapes {completedCount}/{totalCount} • Mis à jour {timeAgo(lastUpdate)}
+                </p>
               </div>
-            </div>
-
-            <div className="mt-6 h-2.5 w-full rounded-full bg-slate-100 ring-1 ring-[#E2E8F0] overflow-hidden">
-              <div
-                className="h-full rounded-full bg-[linear-gradient(135deg,#4F46E5_0%,#6366F1_60%,#7C3AED_100%)] transition-all duration-500"
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-
-            <div className="mt-3 flex justify-between text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
-              <span>Début</span>
-              <span className="text-indigo-700">
-                {pct}% ({completedCount}/{totalCount})
-              </span>
-              <span>Fin</span>
-            </div>
-
-            <div className="mt-6 flex flex-col sm:flex-row gap-3">
-              <button
-                onClick={goPrev}
-                className="flex-1 rounded-2xl border border-[#E2E8F0] bg-white px-4 py-3 text-sm font-extrabold text-slate-800 hover:bg-slate-50 transition"
-              >
-                Étape précédente
-              </button>
-              <button
-                onClick={goNext}
-                className="flex-1 rounded-2xl px-4 py-3 text-sm font-extrabold text-white
-                           bg-[linear-gradient(135deg,#4F46E5_0%,#6366F1_60%,#7C3AED_100%)]
-                           shadow-[0_12px_28px_rgba(79,70,229,0.22)]
-                           transition-all duration-200 ease-out
-                           hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(79,70,229,0.28)]
-                           active:translate-y-[1px]"
-              >
-                Étape suivante
-              </button>
             </div>
           </div>
-        </section>
+        </div>
 
         {/* Timeline */}
-        <section className="mt-10">
-          <h3 className="text-lg font-extrabold tracking-tight">Étapes du dossier</h3>
+        <section className="px-4 py-2">
+          <h3 className="text-lg font-extrabold mb-4 text-slate-900">Étapes du dossier</h3>
 
-          <div className="mt-5 space-y-0 relative before:absolute before:left-[19px] before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
-            {DEMO_STEPS.map((s) => {
-              const done = s.id < currentStepId;
-              const isCurrentStep = s.id === currentStepId;
-              const locked = s.id > currentStepId;
+          <div className="space-y-0 relative before:absolute before:left-[19px] before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+            {displaySteps.map((s, idx) => {
+              const isDone = s.is_completed;
+              const allDone = displaySteps.length > 0 && displaySteps.every((x) => x.is_completed);
+              const isCurrent = idx === currentIndex && !allDone;
+              const isPending = !s.is_completed && !isCurrent;
 
               return (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => setCurrentStepId(s.id)}
-                  className="relative w-full text-left"
-                >
-                  <div className="relative flex gap-4 pb-8 items-start">
-                    <div
+                <div key={s.order_index} className="relative flex gap-4 pb-8 items-start">
+                  {/* Icon */}
+                  {isDone && (
+                    <div className="relative z-10 flex size-10 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white shadow-sm">
+                      <Check className="size-4" />
+                    </div>
+                  )}
+
+                  {isCurrent && (
+                    <div className="relative z-10 flex size-10 shrink-0 items-center justify-center rounded-full bg-white border-4 border-indigo-600 text-indigo-700 shadow-[0_12px_28px_rgba(79,70,229,0.18)]">
+                      <Hourglass className="size-4 animate-pulse" />
+                    </div>
+                  )}
+
+                  {isPending && (
+                    <div className="relative z-10 flex size-10 shrink-0 items-center justify-center rounded-full bg-slate-100 border-2 border-slate-200 text-slate-400">
+                      <Lock className="size-4" />
+                    </div>
+                  )}
+
+                  {/* Text */}
+                  <div className="flex flex-col pt-1">
+                    <h4
                       className={[
-                        "relative z-10 flex size-10 shrink-0 items-center justify-center rounded-full shadow-sm transition",
-                        done ? "bg-indigo-600 text-white" : "",
-                        isCurrentStep ? "bg-white border-4 border-indigo-600 text-indigo-700" : "",
-                        locked ? "bg-slate-100 border-2 border-slate-200 text-slate-400" : "",
+                        "font-extrabold",
+                        isCurrent ? "text-indigo-700" : isPending ? "text-slate-400" : "text-slate-900",
                       ].join(" ")}
                     >
-                      {done ? (
-                        <Check className="size-5" />
-                      ) : isCurrentStep ? (
-                        <Hourglass className="size-5 animate-pulse" />
-                      ) : (
-                        <Lock className="size-5" />
-                      )}
-                    </div>
-
-                    <div className="flex flex-col pt-1 min-w-0">
-                      <div
-                        className={[
-                          "font-extrabold truncate",
-                          isCurrentStep ? "text-indigo-700" : done ? "text-slate-900" : "text-slate-400",
-                        ].join(" ")}
-                      >
-                        {s.label}
-                      </div>
-                      <div
-                        className={[
-                          "text-sm font-semibold",
-                          isCurrentStep ? "text-slate-600" : done ? "text-slate-500" : "text-slate-400",
-                        ].join(" ")}
-                      >
-                        {isCurrentStep ? s.desc : done ? "Validé" : "En attente"}
-                      </div>
-                    </div>
-
-                    <div className="ml-auto pt-1 shrink-0">
-                      <span
-                        className={[
-                          "inline-flex items-center rounded-full px-3 py-1 text-xs font-extrabold border",
-                          done ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "",
-                          isCurrentStep ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "",
-                          locked ? "bg-white text-slate-400 border-slate-200" : "",
-                        ].join(" ")}
-                      >
-                        {done ? "OK" : isCurrentStep ? "EN COURS" : "LOCK"}
-                      </span>
-                    </div>
+                      {s.label}
+                    </h4>
+                    <p className={["text-sm", isPending ? "text-slate-400" : "text-slate-500"].join(" ")}>
+                      {isDone ? "Validé" : isCurrent ? "En cours" : "À venir"}
+                    </p>
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
         </section>
 
-        {/* Bottom actions (upload + mail + phone) */}
-        <section className="mt-2">
-          <div className="rounded-3xl border border-[#E2E8F0] bg-white shadow-[0_20px_60px_rgba(15,23,42,0.06)] p-6">
-            <div className="flex items-center gap-4">
-              <button
-                type="button"
-                onClick={() => alert("Démo : l’upload est désactivé ici.")}
-                className="flex-1 flex items-center justify-center gap-2 font-extrabold py-4 rounded-2xl
-                           shadow-[0_12px_28px_rgba(79,70,229,0.18)]
-                           transition-all active:scale-[0.98]
-                           text-white bg-[linear-gradient(135deg,#4F46E5_0%,#6366F1_60%,#7C3AED_100%)]
-                           hover:brightness-[1.03]"
-              >
-                <FileUp className="size-5" />
-                <span className="text-sm">Ajouter un document</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => alert("Démo : mail")}
-                className="flex size-14 items-center justify-center rounded-full bg-white border border-[#E2E8F0]
-                           shadow-sm hover:bg-slate-50 transition"
-                aria-label="Contacter par mail"
-              >
-                <Mail className="size-5 text-indigo-700" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => alert("Démo : téléphone")}
-                className="flex size-14 items-center justify-center rounded-full bg-white border border-[#E2E8F0]
-                           shadow-sm hover:bg-slate-50 transition"
-                aria-label="Contacter par téléphone"
-              >
-                <Phone className="size-5 text-indigo-700" />
-              </button>
+        {/* Reference & Actions */}
+        <section className="p-4 mt-4">
+          <div className="bg-indigo-50/50 border border-indigo-100 rounded-3xl p-5 mb-6">
+            <div className="flex justify-between items-center mb-3">
+              <span className="text-sm text-slate-500">Référence dossier</span>
+              <span className="text-sm font-mono font-extrabold text-slate-900">#{project.access_token}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-slate-500">Conseiller dédié</span>
+              <span className="text-sm font-semibold text-slate-900">{project.broker_email || "—"}</span>
             </div>
           </div>
-        </section>
 
-        {/* CTA */}
-        <section className="mt-8 text-center">
-          <a
-            href="/login"
-            className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-7 py-4 text-sm font-extrabold text-white hover:bg-slate-800 transition"
-          >
-            Passer sur mon espace Pro
-          </a>
-          <div className="mt-3 text-xs font-semibold text-slate-500">
-            Démo : aucune donnée réelle n’est modifiée.
+          <div className="flex items-center gap-4">
+            {/* Upload (primary) */}
+            <label
+              className={`flex-1 flex items-center justify-center gap-2 font-extrabold py-4 rounded-2xl transition-all active:scale-[0.98] cursor-pointer ${
+                uploadSuccess
+                  ? "bg-emerald-500 text-white shadow-[0_12px_28px_rgba(16,185,129,0.18)]"
+                  : "text-white shadow-[0_12px_28px_rgba(79,70,229,0.22)] hover:shadow-[0_18px_40px_rgba(79,70,229,0.28)] hover:-translate-y-0.5 bg-[linear-gradient(135deg,#4F46E5_0%,#6366F1_60%,#7C3AED_100%)]"
+              }`}
+            >
+              {uploading ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : uploadSuccess ? (
+                <CheckCircle2 size={20} />
+              ) : (
+                <FileUp size={20} />
+              )}
+
+              <span className="text-sm">
+                {uploading ? "Envoi..." : uploadSuccess ? "Document reçu !" : "Ajouter un document"}
+              </span>
+
+              <input type="file" className="hidden" onChange={handleUpload} disabled={uploading} />
+            </label>
+
+            {/* Phone bubble */}
+            {phoneHref && (
+              <a
+                href={phoneHref}
+                className="flex size-14 items-center justify-center rounded-full bg-white border border-[#E2E8F0] shadow-sm hover:bg-slate-50 transition"
+                aria-label="Appeler le conseiller"
+              >
+                <Phone className="size-5 text-indigo-700" />
+              </a>
+            )}
+
+            {/* Mail bubble */}
+            <a
+              href={`mailto:${project.broker_email}?subject=${encodeURIComponent(
+                `Question sur mon dossier ${project.client_name}`
+              )}`}
+              className="flex size-14 items-center justify-center rounded-full bg-white border border-[#E2E8F0] shadow-sm hover:bg-slate-50 transition"
+              aria-label="Envoyer un email au conseiller"
+            >
+              <MessageCircle className="size-5 text-indigo-700" />
+            </a>
           </div>
         </section>
       </main>
+
+      {/* Bottom bar */}
+      <nav className="fixed bottom-0 left-0 right-0 z-20 bg-white/85 backdrop-blur-md border-t border-[#E2E8F0]">
+        <div className="flex max-w-2xl mx-auto px-4 py-2">
+          <button
+            type="button"
+            className="flex flex-1 flex-col items-center justify-center gap-1 text-slate-400 py-1"
+            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          >
+            <Home className="size-5" />
+            <span className="text-[10px] font-semibold leading-none">Accueil</span>
+          </button>
+
+          <button
+            type="button"
+            className="flex flex-1 flex-col items-center justify-center gap-1 text-indigo-700 py-1 border-t-2 border-indigo-600 -mt-2"
+            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          >
+            <FileUp className="size-5" />
+            <span className="text-[10px] font-semibold leading-none">Dossier</span>
+          </button>
+
+          <a
+            className="flex flex-1 flex-col items-center justify-center gap-1 text-slate-400 py-1 hover:text-indigo-700 transition"
+            href={`mailto:${project.broker_email}`}
+          >
+            <MessageCircle className="size-5" />
+            <span className="text-[10px] font-semibold leading-none">Messages</span>
+          </a>
+
+          {phoneHref ? (
+            <a
+              href={phoneHref}
+              className="flex flex-1 flex-col items-center justify-center gap-1 text-slate-400 py-1 hover:text-indigo-700 transition"
+            >
+              <Phone className="size-5" />
+              <span className="text-[10px] font-semibold leading-none">Appeler</span>
+            </a>
+          ) : (
+            <button
+              type="button"
+              className="flex flex-1 flex-col items-center justify-center gap-1 text-slate-300 py-1 cursor-not-allowed"
+              onClick={() => alert("Numéro indisponible.")}
+            >
+              <Phone className="size-5" />
+              <span className="text-[10px] font-semibold leading-none">Appeler</span>
+            </button>
+          )}
+        </div>
+      </nav>
     </div>
   );
 }
