@@ -104,7 +104,7 @@ export default function HomePage() {
 
             <div className="mt-12 flex flex-col gap-4 sm:flex-row sm:justify-center">
               <a
-                href="/demo"
+                href="#demo"
                 className="rounded-2xl px-10 py-5 text-base font-extrabold text-white
                            bg-[linear-gradient(135deg,#4F46E5_0%,#6366F1_60%,#7C3AED_100%)]
                            shadow-[0_12px_28px_rgba(79,70,229,0.22)]
@@ -371,7 +371,7 @@ export default function HomePage() {
 
             <div className="mt-8">
               <a
-                href="/demo"
+                href="#demo"
                 className="inline-flex w-full items-center justify-center rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] px-6 py-4 text-sm font-extrabold text-slate-800 hover:bg-slate-50 transition"
               >
                 Ouvrir la démo
@@ -563,7 +563,7 @@ export default function HomePage() {
               Commencer maintenant
             </a>
             <a
-              href="/demo"
+              href="#demo"
               className="rounded-2xl border border-white/30 bg-white/10 px-8 py-4 text-sm font-extrabold text-white hover:bg-white/15 transition"
             >
               Découvrir la démo
@@ -594,7 +594,7 @@ export default function HomePage() {
               <a className="block text-sm font-semibold text-slate-600 hover:text-slate-900" href="#benefices">
                 Bénéfices
               </a>
-              <a className="block text-sm font-semibold text-slate-600 hover:text-slate-900" href="/demo">
+              <a className="block text-sm font-semibold text-slate-600 hover:text-slate-900" href="#demo">
                 Démo
               </a>
               <a className="block text-sm font-semibold text-slate-600 hover:text-slate-900" href="#tarifs">
