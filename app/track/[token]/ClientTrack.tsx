@@ -81,9 +81,13 @@ function clampPct(n: number | null | undefined) {
 
 function normalizeType(t: string | null | undefined) {
   const v = (t ?? "").toLowerCase().trim();
+
   if (v === "immobilier") return "immo";
   if (v === "formation") return "of";
-  if (v === "immo" || v === "of") return v;
+  if (v === "artisan" || v === "artisans") return "artisan";
+
+  if (v === "immo" || v === "of" || v === "artisan") return v;
+
   return "other";
 }
 
