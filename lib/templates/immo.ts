@@ -1,4 +1,4 @@
-export const IMMO_STEPS = [
+export const ARTISAN_STEPS = [
   "Mandat signé",
   "Shooting photo réalisé",
   "Annonce publiée",
