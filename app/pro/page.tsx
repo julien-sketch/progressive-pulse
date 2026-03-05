@@ -62,9 +62,13 @@ const STEPS_BY_TYPE: Record<string, StepDef[]> = {
     { label: "Déblocage fonds" },
   ],
   artisan: [
-    { label: "Demande reçue" },
     { label: "Devis envoyé" },
-    { label: "Planification" },
+    { label: "Devis accepté" },
+    { label: "Commande materiel" },
+    { label: "travaux en cours" },
+    { label: "Travaux terminés", },
+    { label: "Visite fin de travaux" },
+    { label: "Facture envoyée" },
     { label: "Terminé" },
   ],
   freelance: [
