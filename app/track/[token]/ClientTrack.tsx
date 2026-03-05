@@ -57,6 +57,16 @@ const STATUS_BY_TYPE: Record<string, StatusDef[]> = {
     { label: "Remboursement en cours", percent: 90 },
     { label: "Paiement validé", percent: 100 },
   ],
+  artisan: [
+    { label: "Devis envoyé", percent: 0  },
+    { label: "Devis accepté", percent: 15 },
+    { label: "Commande materiel", percent: 30 },
+    { label: "travaux en cours", percent: 45 },
+    { label: "Travaux terminés", percent: 65 },
+    { label: "Visite fin de travaux", percent: 80 },
+    { label: "Facture envoyée", percent: 90 },
+    { label: "Terminé", percent: 100 },
+  ],
   other: [
     { label: "Documents reçus", percent: 0 },
     { label: "Dossier complet", percent: 50 },
