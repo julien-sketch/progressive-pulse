@@ -28,7 +28,7 @@ export default function SignupPage() {
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [profession, setProfession] = useState<ProfessionValue>("other");
+  const [profession, setProfession] = useState<ProfessionValue>("courtier");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
@@ -51,8 +51,13 @@ export default function SignupPage() {
       return;
     }
 
-    if (password.length < 6) {
-      setErrorMsg("Le mot de passe doit contenir au moins 6 caractères.");
+    if (!phone.trim()) {
+      setErrorMsg("Renseigne ton téléphone.");
+      return;
+    }
+
+    if (password.length < 8) {
+      setErrorMsg("Le mot de passe doit contenir au moins 8 caractères.");
       return;
     }
 
@@ -70,14 +75,14 @@ export default function SignupPage() {
           : undefined;
 
       const { data, error } = await supabase.auth.signUp({
-        email: email.trim(),
+        email: email.trim().toLowerCase(),
         password,
         options: {
           emailRedirectTo: redirectTo,
           data: {
             first_name: firstName.trim(),
             last_name: lastName.trim(),
-            phone: phone.trim() || null,
+            phone: phone.trim(),
             profession,
           },
         },
@@ -87,53 +92,11 @@ export default function SignupPage() {
         throw error;
       }
 
-      const userId = data.user?.id;
-
-      if (!userId) {
-        setSuccessMsg(
-          "Compte créé. Vérifie ton email pour confirmer ton inscription."
-        );
-        return;
-      }
-
-      // 1) Profil
-      const { error: profileError } = await supabase.from("profiles").upsert(
-        {
-          user_id: userId,
-          email: email.trim(),
-          first_name: firstName.trim(),
-          last_name: lastName.trim(),
-          phone: phone.trim() || null,
-          profession,
-        },
-        { onConflict: "user_id" }
-      );
-
-      if (profileError) {
-        throw profileError;
-      }
-
-      // 2) Crédit gratuit initial
-      // Table dédiée : user_credits
-      const { error: creditError } = await supabase.from("user_credits").upsert(
-        {
-          user_id: userId,
-          credits_remaining: 1,
-          free_credit_granted: true,
-        },
-        { onConflict: "user_id" }
-      );
-
-      if (creditError) {
-        throw creditError;
-      }
-
-      // Si confirmation email désactivée, session active directement
       const {
         data: { session },
       } = await supabase.auth.getSession();
 
-      if (session) {
+      if (session || data.session) {
         window.location.href = "/pro";
         return;
       }
@@ -177,8 +140,8 @@ export default function SignupPage() {
             </h1>
 
             <p className="mb-8 max-w-lg text-base font-semibold leading-relaxed text-slate-500">
-              Aucun abonnement. Aucune carte bancaire. Tu crées ton compte,
-              tu reçois 1 crédit gratuit, puis tu peux commencer immédiatement.
+              Aucun abonnement. Aucune carte bancaire. Tu crées ton compte, tu
+              reçois 1 crédit gratuit, puis tu peux commencer immédiatement.
             </p>
 
             <div className="space-y-4">
@@ -266,7 +229,7 @@ export default function SignupPage() {
 
               <div>
                 <label className="mb-2 block text-xs font-extrabold uppercase tracking-wider text-slate-400">
-                  Profession
+                  Métier
                 </label>
                 <select
                   value={profession}
@@ -290,7 +253,7 @@ export default function SignupPage() {
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Minimum 6 caractères"
+                    placeholder="Minimum 8 caractères"
                     className="w-full rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] px-4 py-3.5 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                   />
                 </div>
@@ -332,7 +295,10 @@ export default function SignupPage() {
 
             <div className="mt-6 text-center text-sm font-semibold text-slate-500">
               Déjà inscrit ?{" "}
-              <Link href="/login" className="font-extrabold text-indigo-600 hover:text-indigo-700">
+              <Link
+                href="/login"
+                className="font-extrabold text-indigo-600 hover:text-indigo-700"
+              >
                 Connexion
               </Link>
             </div>
