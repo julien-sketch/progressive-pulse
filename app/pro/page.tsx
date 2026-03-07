@@ -141,11 +141,11 @@ export default function ProPage() {
   const [updatingProjectId, setUpdatingProjectId] = useState<string | null>(null);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
 
-  const stripeCheckoutPack5 = `https://buy.stripe.com/test_4gM00kbX6fU93rg6Xl18c01?prefilled_email=${encodeURIComponent(
+  const stripeCheckoutPack5 = `https://buy.stripe.com/dRm14obRfdUkfeJ8kHeIw04?prefilled_email=${encodeURIComponent(
   userEmail || ""
   )}`;
 
-  const stripeCheckoutPack15 = `https://buy.stripe.com/test_3cI5kEaT29vL1j8a9x18c00?prefilled_email=${encodeURIComponent(
+  const stripeCheckoutPack15 = `https://buy.stripe.com/6oU5kE4oN5nO2rX9oLeIw03?prefilled_email=${encodeURIComponent(
     userEmail || ""
   )}`;
 
