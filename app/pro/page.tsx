@@ -64,9 +64,9 @@ const STEPS_BY_TYPE: Record<string, StepDef[]> = {
   artisan: [
     { label: "Devis envoyé" },
     { label: "Devis accepté" },
-    { label: "Commande materiel" },
-    { label: "travaux en cours" },
-    { label: "Travaux terminés", },
+    { label: "Commande matériel" },
+    { label: "Travaux en cours" },
+    { label: "Travaux terminés" },
     { label: "Visite fin de travaux" },
     { label: "Facture envoyée" },
     { label: "Terminé" },
@@ -77,7 +77,11 @@ const STEPS_BY_TYPE: Record<string, StepDef[]> = {
     { label: "En cours" },
     { label: "Livré" },
   ],
-  other: [{ label: "Documents reçus" }, { label: "Dossier complet" }, { label: "Terminé" }],
+  other: [
+    { label: "Documents reçus" },
+    { label: "Dossier complet" },
+    { label: "Terminé" },
+  ],
 };
 
 const PROFESSION_OPTIONS: Array<{ value: string; label: string }> = [
@@ -130,26 +134,20 @@ export default function ProPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
 
-  // Draft profil
-  const [professionDraft, setProfessionDraft] = useState<string>("other");
-  const [phoneDraft, setPhoneDraft] = useState<string>("");
-  const [savingProfile, setSavingProfile] = useState(false);
-
-  // create dossier
   const [clientName, setClientName] = useState<string>("");
   const [projectTitle, setProjectTitle] = useState<string>("");
-  const [creating, setCreating] = useState(false);
 
+  const [creating, setCreating] = useState(false);
   const [updatingProjectId, setUpdatingProjectId] = useState<string | null>(null);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
 
-  const stripeCheckoutPack10 = `https://buy.stripe.com/9B6fZi7AZ2bC0jPfN9eIw01?prefilled_email=${encodeURIComponent(
+  const stripeCheckoutPack5 = `https://buy.stripe.com/test_4gM00kbX6fU93rg6Xl18c01?prefilled_email=${encodeURIComponent(
   userEmail || ""
-)}`;
+  )}`;
 
-const stripeCheckoutSingle = `https://buy.stripe.com/bJe14o5sR7vWd6B9oLeIw02?prefilled_email=${encodeURIComponent(
-  userEmail || ""
-)}`;
+  const stripeCheckoutPack15 = `https://buy.stripe.com/test_3cI5kEaT29vL1j8a9x18c00?prefilled_email=${encodeURIComponent(
+    userEmail || ""
+  )}`;
 
   const loadAll = async () => {
     setLoading(true);
@@ -172,7 +170,6 @@ const stripeCheckoutSingle = `https://buy.stripe.com/bJe14o5sR7vWd6B9oLeIw02?pre
     setUserId(uid);
     setUserEmail(email);
 
-    // credits
     const { data: walletRow, error: walletErr } = await supabase
       .from("credit_wallets")
       .select("credits")
@@ -186,8 +183,8 @@ const stripeCheckoutSingle = `https://buy.stripe.com/bJe14o5sR7vWd6B9oLeIw02?pre
       setCredits(Number(walletRow?.credits ?? 0));
     }
 
-    // profile
     setProfileLoading(true);
+
     const { data: prof, error: profErr } = await supabase
       .from("profiles")
       .select("user_id,email,first_name,last_name,phone,profession")
@@ -200,13 +197,9 @@ const stripeCheckoutSingle = `https://buy.stripe.com/bJe14o5sR7vWd6B9oLeIw02?pre
       console.error("profiles:", profErr);
       setProfile(null);
     } else {
-      const p = (prof ?? null) as Profile | null;
-      setProfile(p);
-      setProfessionDraft(normalizeType(p?.profession));
-      setPhoneDraft((p?.phone ?? "").toString());
+      setProfile((prof ?? null) as Profile | null);
     }
 
-    // projects
     const { data: projectsData, error: projectsErr } = await supabase
       .from("projects")
       .select(
@@ -251,39 +244,13 @@ const stripeCheckoutSingle = `https://buy.stripe.com/bJe14o5sR7vWd6B9oLeIw02?pre
     normalizeType(profile.profession) !== "other" &&
     !!(profile.phone && profile.phone.trim().length >= 6);
 
-  const saveProfile = async () => {
-    if (!userId) return;
-    const phone = phoneDraft.trim();
-    const prof = normalizeType(professionDraft);
-
-    if (!phone || phone.length < 6) return alert("Téléphone invalide.");
-    if (!prof) return alert("Métier invalide.");
-
-    setSavingProfile(true);
-
-    const { error } = await supabase
-      .from("profiles")
-      .update({
-        phone,
-        profession: prof,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("user_id", userId);
-
-    setSavingProfile(false);
-
-    if (error) {
-      console.error("saveProfile:", error);
-      alert(error.message);
-      return;
-    }
-
-    await loadAll();
-  };
-
   const createDossier = async () => {
     if (creating) return;
-    if (!profileOk) return alert("Profil incomplet : renseigne métier + téléphone.");
+    if (!profileOk) {
+      return alert(
+        "Profil incomplet : téléphone ou métier manquant. Reconnecte-toi avec un compte correctement créé ou mets à jour le profil en base."
+      );
+    }
 
     const name = clientName.trim();
     if (!name) return alert("Renseigne le nom du client.");
@@ -333,7 +300,9 @@ const stripeCheckoutSingle = `https://buy.stripe.com/bJe14o5sR7vWd6B9oLeIw02?pre
 
   const deleteDossier = async (project: Project) => {
     if (deletingProjectId) return;
-    if (project.owner_user_id !== userId) return alert("Suppression refusée (owner_user_id).");
+    if (project.owner_user_id !== userId) {
+      return alert("Suppression refusée (owner_user_id).");
+    }
 
     const ok = confirm(
       `Supprimer définitivement le dossier "${project.client_name}" ?\n\nCette action est irréversible.`
@@ -373,7 +342,7 @@ const stripeCheckoutSingle = `https://buy.stripe.com/bJe14o5sR7vWd6B9oLeIw02?pre
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-[#F8FAFC]">
         <div className="rounded-2xl border border-[#E2E8F0] bg-white px-6 py-4 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
           <div className="text-sm font-semibold text-slate-600">Chargement…</div>
         </div>
@@ -387,42 +356,46 @@ const stripeCheckoutSingle = `https://buy.stripe.com/bJe14o5sR7vWd6B9oLeIw02?pre
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] px-6 py-8 text-slate-900">
-      {/* subtle background glow */}
       <div aria-hidden className="fixed inset-0 -z-10">
         <div className="absolute inset-0 bg-[#F8FAFC]" />
-        <div className="absolute -top-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full blur-3xl opacity-30 bg-[radial-gradient(circle,rgba(79,70,229,0.18),transparent_60%)]" />
-        <div className="absolute top-24 -left-44 h-[420px] w-[420px] rounded-full blur-3xl opacity-20 bg-[radial-gradient(circle,rgba(13,148,136,0.12),transparent_60%)]" />
+        <div className="absolute -top-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(79,70,229,0.18),transparent_60%)] opacity-30 blur-3xl" />
+        <div className="absolute top-24 -left-44 h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(13,148,136,0.12),transparent_60%)] opacity-20 blur-3xl" />
       </div>
 
-      <div className="max-w-7xl mx-auto">
-        {/* HEADER */}
+      <div className="mx-auto max-w-7xl">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-700 text-xs font-extrabold uppercase tracking-wider ring-1 ring-indigo-100">
+            <div className="inline-flex items-center gap-2 rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-extrabold uppercase tracking-wider text-indigo-700 ring-1 ring-indigo-100">
               Progressive Pulse
             </div>
             <h1 className="mt-3 text-4xl font-extrabold tracking-tight">Dashboard Pro</h1>
-            <p className="text-sm text-slate-500 mt-1 font-semibold">Connecté : {userEmail}</p>
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              Connecté : {userEmail}
+            </p>
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              Métier : {profileLoading ? "…" : metierLabel || "—"} · Téléphone :{" "}
+              {profileLoading ? "…" : profile?.phone || "—"}
+            </p>
           </div>
 
           <button
             onClick={logout}
-            className="rounded-2xl bg-slate-900 text-white px-6 py-3 font-extrabold hover:bg-slate-800 transition"
+            className="rounded-2xl bg-slate-900 px-6 py-3 font-extrabold text-white transition hover:bg-slate-800"
           >
             Déconnexion
           </button>
         </div>
 
-        <div className="mt-8 grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
-          {/* MAIN */}
+        <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
           <div className="space-y-6">
-            {/* CARD: Nombre de dossiers */}
-            <div className="rounded-3xl border border-[#E2E8F0] bg-white shadow-[0_20px_60px_rgba(15,23,42,0.06)] p-8">
+            <div className="rounded-3xl border border-[#E2E8F0] bg-white p-8 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
               <div className="flex items-center justify-between">
-                <div className="text-xs font-extrabold tracking-widest text-slate-400">DOSSIERS</div>
+                <div className="text-xs font-extrabold tracking-widest text-slate-400">
+                  DOSSIERS
+                </div>
                 <button
                   onClick={loadAll}
-                  className="rounded-2xl border border-[#E2E8F0] bg-white px-4 py-2 text-sm font-extrabold hover:bg-slate-50 transition"
+                  className="rounded-2xl border border-[#E2E8F0] bg-white px-4 py-2 text-sm font-extrabold transition hover:bg-slate-50"
                 >
                   Rafraîchir
                 </button>
@@ -430,29 +403,34 @@ const stripeCheckoutSingle = `https://buy.stripe.com/bJe14o5sR7vWd6B9oLeIw02?pre
 
               <div className="mt-4 flex items-end gap-3">
                 <div className="text-6xl font-extrabold leading-none">{projects.length}</div>
-                <div className="pb-2 text-slate-600 font-semibold">dossiers en cours / créés</div>
+                <div className="pb-2 font-semibold text-slate-600">
+                  dossiers en cours / créés
+                </div>
               </div>
 
               {!profileOk && (
-                <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900 font-bold">
-                  Profil incomplet : métier et téléphone obligatoires (sinon création bloquée).
+                <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 font-bold text-amber-900">
+                  Profil incomplet : métier et téléphone obligatoires. Cette situation
+                  concerne surtout les anciens comptes créés avant la nouvelle inscription.
                 </div>
               )}
             </div>
 
-            {/* CARD: Création de dossier */}
-            <div className="rounded-3xl border border-[#E2E8F0] bg-white shadow-[0_20px_60px_rgba(15,23,42,0.06)] p-8">
-              <div className="text-xs font-extrabold tracking-widest text-slate-400">CRÉER UN DOSSIER</div>
+            <div className="rounded-3xl border border-[#E2E8F0] bg-white p-8 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+              <div className="text-xs font-extrabold tracking-widest text-slate-400">
+                CRÉER UN DOSSIER
+              </div>
 
-              <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
-                  <div className="text-xs font-extrabold tracking-widest text-slate-400">CLIENT</div>
+                  <div className="text-xs font-extrabold tracking-widest text-slate-400">
+                    CLIENT
+                  </div>
                   <input
                     value={clientName}
                     onChange={(e) => setClientName(e.target.value)}
                     placeholder="ex: Mr ou Mme X"
-                    className="mt-2 w-full rounded-2xl border border-[#E2E8F0] bg-white px-4 py-3 font-semibold outline-none transition-all
-                               focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100"
+                    className="mt-2 w-full rounded-2xl border border-[#E2E8F0] bg-white px-4 py-3 font-semibold outline-none transition-all focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100"
                   />
                 </div>
 
@@ -464,8 +442,7 @@ const stripeCheckoutSingle = `https://buy.stripe.com/bJe14o5sR7vWd6B9oLeIw02?pre
                     value={projectTitle}
                     onChange={(e) => setProjectTitle(e.target.value)}
                     placeholder="ex: Achat résidence principale"
-                    className="mt-2 w-full rounded-2xl border border-[#E2E8F0] bg-white px-4 py-3 font-semibold outline-none transition-all
-                               focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100"
+                    className="mt-2 w-full rounded-2xl border border-[#E2E8F0] bg-white px-4 py-3 font-semibold outline-none transition-all focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100"
                   />
                 </div>
               </div>
@@ -473,25 +450,22 @@ const stripeCheckoutSingle = `https://buy.stripe.com/bJe14o5sR7vWd6B9oLeIw02?pre
               <button
                 onClick={createDossier}
                 disabled={creating || !profileOk}
-                className="mt-5 w-full rounded-2xl px-6 py-4 font-extrabold text-white transition disabled:opacity-40
-                           bg-[linear-gradient(135deg,#4F46E5_0%,#6366F1_60%,#7C3AED_100%)]
-                           shadow-[0_12px_28px_rgba(79,70,229,0.22)]
-                           hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(79,70,229,0.28)]
-                           active:translate-y-[1px]"
-                title={!profileOk ? "Complète ton profil d'abord" : ""}
+                className="mt-5 w-full rounded-2xl bg-[linear-gradient(135deg,#4F46E5_0%,#6366F1_60%,#7C3AED_100%)] px-6 py-4 font-extrabold text-white shadow-[0_12px_28px_rgba(79,70,229,0.22)] transition disabled:opacity-40 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(79,70,229,0.28)] active:translate-y-[1px]"
+                title={!profileOk ? "Profil incomplet" : ""}
               >
                 {creating ? "Création..." : "Créer (1 crédit)"}
               </button>
 
-              <p className="mt-3 text-sm text-slate-500 font-semibold">
+              <p className="mt-3 text-sm font-semibold text-slate-500">
                 1 dossier créé = 1 crédit consommé.
               </p>
             </div>
 
-            {/* LISTE DOSSIERS */}
-            <div className="rounded-3xl border border-[#E2E8F0] bg-white shadow-[0_20px_60px_rgba(15,23,42,0.06)] p-8">
+            <div className="rounded-3xl border border-[#E2E8F0] bg-white p-8 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
               <div className="flex items-center justify-between">
-                <div className="text-xs font-extrabold tracking-widest text-slate-400">LISTE DES DOSSIERS</div>
+                <div className="text-xs font-extrabold tracking-widest text-slate-400">
+                  LISTE DES DOSSIERS
+                </div>
                 <div className="text-sm font-extrabold text-slate-500">{projects.length}</div>
               </div>
 
@@ -514,21 +488,29 @@ const stripeCheckoutSingle = `https://buy.stripe.com/bJe14o5sR7vWd6B9oLeIw02?pre
 
                   return (
                     <div key={p.id} className="rounded-3xl border border-[#E2E8F0] bg-white p-6">
-                      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                         <div className="min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
+                          <div className="flex flex-wrap items-center gap-2">
                             <div className="text-xl font-extrabold">{p.client_name}</div>
+
                             {p.project_title && (
-                              <span className="text-xs font-extrabold text-slate-500">• {p.project_title}</span>
+                              <span className="text-xs font-extrabold text-slate-500">
+                                • {p.project_title}
+                              </span>
                             )}
-                            <div className="text-xs font-extrabold tracking-widest text-slate-400">• {t.toUpperCase()}</div>
+
+                            <div className="text-xs font-extrabold tracking-widest text-slate-400">
+                              • {t.toUpperCase()}
+                            </div>
 
                             <span className="inline-flex items-center rounded-full bg-indigo-50 px-3 py-1 text-xs font-extrabold text-indigo-700 ring-1 ring-indigo-100">
                               Étape en cours : {currentLabel}
                             </span>
                           </div>
 
-                          <div className="mt-2 text-sm font-semibold text-slate-600">Progression : {progress}%</div>
+                          <div className="mt-2 text-sm font-semibold text-slate-600">
+                            Progression : {progress}%
+                          </div>
 
                           {!isFinished && idxCurrent === -1 && statusText && (
                             <div className="mt-1 text-xs font-semibold text-amber-600">
@@ -546,7 +528,7 @@ const stripeCheckoutSingle = `https://buy.stripe.com/bJe14o5sR7vWd6B9oLeIw02?pre
                         <div className="flex items-center gap-3">
                           <button
                             onClick={() => copyLink(p.access_token)}
-                            className="rounded-2xl border border-[#E2E8F0] bg-white px-4 py-2 text-sm font-extrabold hover:bg-slate-50 transition"
+                            className="rounded-2xl border border-[#E2E8F0] bg-white px-4 py-2 text-sm font-extrabold transition hover:bg-slate-50"
                           >
                             Copier lien
                           </button>
@@ -555,7 +537,7 @@ const stripeCheckoutSingle = `https://buy.stripe.com/bJe14o5sR7vWd6B9oLeIw02?pre
                             href={`/track/${p.access_token}`}
                             target="_blank"
                             rel="noreferrer"
-                            className="rounded-2xl bg-slate-900 text-white px-4 py-2 text-sm font-extrabold hover:bg-slate-800 transition"
+                            className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-extrabold text-white transition hover:bg-slate-800"
                           >
                             Ouvrir
                           </a>
@@ -563,18 +545,16 @@ const stripeCheckoutSingle = `https://buy.stripe.com/bJe14o5sR7vWd6B9oLeIw02?pre
                           <button
                             onClick={() => deleteDossier(p)}
                             disabled={!canUpdate || isDeleting}
-                            className="rounded-2xl border border-red-200 bg-white px-4 py-2 text-sm font-extrabold text-red-600 hover:bg-red-50 transition disabled:opacity-50"
+                            className="rounded-2xl border border-red-200 bg-white px-4 py-2 text-sm font-extrabold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
                           >
                             {isDeleting ? "Suppression..." : "Supprimer"}
                           </button>
                         </div>
                       </div>
 
-                      {/* Steps */}
                       <div className="mt-5 flex flex-wrap gap-2">
                         {stepsDef.map((s, idx) => {
                           const stepIndex1 = idx + 1;
-
                           const completed = isFinished ? true : idxCurrent >= 0 ? idx < idxCurrent : false;
                           const isCurrent = !isFinished && idxCurrent >= 0 && idx === idxCurrent;
 
@@ -582,10 +562,10 @@ const stripeCheckoutSingle = `https://buy.stripe.com/bJe14o5sR7vWd6B9oLeIw02?pre
                           const disabled = !canUpdate || isBusy || isDeleting ? "opacity-50" : "";
 
                           const cls = isCurrent
-                            ? `${base} bg-indigo-600 text-white border-indigo-600`
+                            ? `${base} border-indigo-600 bg-indigo-600 text-white`
                             : completed
-                            ? `${base} bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100`
-                            : `${base} bg-white text-slate-700 border-[#E2E8F0] hover:bg-slate-50`;
+                            ? `${base} border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100`
+                            : `${base} border-[#E2E8F0] bg-white text-slate-700 hover:bg-slate-50`;
 
                           return (
                             <button
@@ -605,95 +585,51 @@ const stripeCheckoutSingle = `https://buy.stripe.com/bJe14o5sR7vWd6B9oLeIw02?pre
                 })}
 
                 {projects.length === 0 && (
-                  <div className="text-sm text-slate-500 font-semibold">Aucun dossier pour le moment.</div>
+                  <div className="text-sm font-semibold text-slate-500">
+                    Aucun dossier pour le moment.
+                  </div>
                 )}
               </div>
             </div>
           </div>
 
-          {/* SIDEBAR */}
           <aside className="space-y-6">
-            {/* Profil */}
-            <div className="rounded-3xl border border-[#E2E8F0] bg-white shadow-[0_20px_60px_rgba(15,23,42,0.06)] p-6">
-              <div className="text-xs font-extrabold tracking-widest text-slate-400">PROFIL</div>
-              <p className="mt-2 text-sm text-slate-600 font-semibold">
-                Métier : {profileLoading ? "…" : metierLabel || "—"} <br />
-                Téléphone : {profileLoading ? "…" : profile?.phone || "—"}
-              </p>
-
-              <div className="mt-4 space-y-3">
-                <div>
-                  <div className="text-[11px] font-extrabold tracking-widest text-slate-400">MÉTIER</div>
-                  <select
-                    value={professionDraft}
-                    onChange={(e) => setProfessionDraft(e.target.value)}
-                    className="mt-2 w-full rounded-2xl border border-[#E2E8F0] bg-white px-4 py-3 font-semibold outline-none transition-all
-                               focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100"
-                  >
-                    {PROFESSION_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <div className="text-[11px] font-extrabold tracking-widest text-slate-400">TÉLÉPHONE</div>
-                  <input
-                    value={phoneDraft}
-                    onChange={(e) => setPhoneDraft(e.target.value)}
-                    placeholder="ex: 06 12 34 56 78"
-                    className="mt-2 w-full rounded-2xl border border-[#E2E8F0] bg-white px-4 py-3 font-semibold outline-none transition-all
-                               focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100"
-                  />
-                </div>
-
-                <button
-                  onClick={saveProfile}
-                  disabled={savingProfile}
-                  className="w-full rounded-2xl px-6 py-3 font-extrabold text-white transition disabled:opacity-50
-                             bg-slate-900 hover:bg-slate-800"
-                >
-                  {savingProfile ? "Sauvegarde..." : "Enregistrer"}
-                </button>
+            <div className="rounded-3xl border border-[#E2E8F0] bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+              <div className="text-xs font-extrabold tracking-widest text-slate-400">
+                CRÉDITS
               </div>
-            </div>
-
-            {/* Crédits */}
-            <div className="rounded-3xl border border-[#E2E8F0] bg-white shadow-[0_20px_60px_rgba(15,23,42,0.06)] p-6">
-              <div className="text-xs font-extrabold tracking-widest text-slate-400">CRÉDITS</div>
 
               <div className="mt-3 flex items-end gap-3">
                 <div className="text-5xl font-extrabold leading-none">{credits}</div>
-                <div className="pb-2 text-slate-600 font-semibold">restants</div>
+                <div className="pb-2 font-semibold text-slate-600">restants</div>
               </div>
 
               <div className="mt-5 grid grid-cols-1 gap-3">
-  <a
-    href={stripeCheckoutSingle}
-    target="_blank"
-    rel="noreferrer"
-    className="inline-flex w-full items-center justify-center rounded-2xl border border-[#E2E8F0] bg-white px-4 py-3 text-sm font-extrabold hover:bg-slate-50 transition"
-  >
-    Acheter 1 dossier — 49€
-  </a>
 
-  <a
-    href={stripeCheckoutPack10}
-    target="_blank"
-    rel="noreferrer"
-    className="inline-flex w-full items-center justify-center rounded-2xl px-4 py-3 text-sm font-extrabold text-white
-               bg-[linear-gradient(135deg,#4F46E5_0%,#6366F1_60%,#7C3AED_100%)]
-               shadow-[0_12px_28px_rgba(79,70,229,0.18)]
-               transition-all duration-200 ease-out
-               hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(79,70,229,0.24)]
-               active:translate-y-[1px]"
-  >
-    Acheter pack 10 dossiers — 290€
-  </a>
-</div>
-            </div>
+                <a
+                href={stripeCheckoutPack5}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex w-full items-center justify-center rounded-2xl border border-[#E2E8F0] bg-white px-4 py-3 text-sm font-extrabold transition hover:bg-slate-50"
+                >
+                Acheter 5 dossiers — 69€
+                </a>
+
+                <a
+                href={stripeCheckoutPack15}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex w-full items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#4F46E5_0%,#6366F1_60%,#7C3AED_100%)] px-4 py-3 text-sm font-extrabold text-white shadow-[0_12px_28px_rgba(79,70,229,0.18)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(79,70,229,0.24)] active:translate-y-[1px]"
+                >
+                Acheter 15 dossiers — 149€
+                </a>
+
+                </div>
+
+                <p className="mt-3 text-xs font-semibold text-slate-500">
+                Les crédits n’expirent jamais.
+                </p>
+              </div>
           </aside>
         </div>
       </div>

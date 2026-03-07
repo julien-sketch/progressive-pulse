@@ -1,76 +1,346 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
+
+function InteractiveDemo() {
+  const [step, setStep] = useState<"create" | "link" | "client">("create");
+  const [clientName, setClientName] = useState("");
+  const [dossierName, setDossierName] = useState("");
+  const [link, setLink] = useState("");
+  const [activeStep, setActiveStep] = useState(0);
+  const [progress, setProgress] = useState(0);
+
+  const dossierSteps = [
+    "Prise en charge",
+    "Documents reçus",
+    "Analyse en cours",
+    "Validation finale",
+    "Dossier clôturé",
+  ];
+
+  const handleGenerate = () => {
+    if (!clientName || !dossierName) return;
+    const slug = dossierName.toLowerCase().replace(/\s+/g, "-");
+    const rand = Math.random().toString(36).slice(2, 6);
+    setLink(`suivi.progressivepulse.app/${slug}-${rand}`);
+    setStep("link");
+  };
+
+  const handleAdvance = () => {
+    if (activeStep < dossierSteps.length - 1) {
+      const next = activeStep + 1;
+      setActiveStep(next);
+      setProgress(Math.round((next / (dossierSteps.length - 1)) * 100));
+    }
+  };
+
+  return (
+    <div className="mx-auto max-w-4xl">
+      <div className="mb-8 flex justify-center">
+        <div className="inline-flex gap-1 rounded-2xl border border-[#E2E8F0] bg-white p-1 shadow-sm">
+          {[
+            { id: "create", label: "1. Créer" },
+            { id: "link", label: "2. Lien généré" },
+            { id: "client", label: "3. Vue client" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setStep(tab.id as "create" | "link" | "client")}
+              className={`rounded-xl px-5 py-2.5 text-xs font-extrabold transition-all ${
+                step === tab.id
+                  ? "bg-indigo-600 text-white shadow-md"
+                  : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-3xl border border-[#E2E8F0] bg-white shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+        <div className="flex items-center gap-2 border-b border-[#E2E8F0] bg-slate-50 px-5 py-3">
+          <span className="size-3 rounded-full bg-red-400" />
+          <span className="size-3 rounded-full bg-amber-400" />
+          <span className="size-3 rounded-full bg-green-400" />
+          <span className="mx-auto text-xs font-semibold text-slate-400">
+            {step === "client"
+              ? link || "suivi.progressivepulse.app/mon-dossier"
+              : "dashboard.progressivepulse.app"}
+          </span>
+        </div>
+
+        <div className="flex min-h-[340px] flex-col justify-center p-8">
+          {step === "create" && (
+            <div className="mx-auto w-full max-w-sm">
+              <div className="mb-8 text-center">
+                <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-4 py-1.5">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-indigo-600">
+                    ⚡ Moins de 10 secondes
+                  </span>
+                </div>
+                <h3 className="text-xl font-extrabold text-slate-800">
+                  Créez votre dossier
+                </h3>
+                <p className="mt-1 text-sm font-semibold text-slate-400">
+                  2 champs. C&apos;est tout.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="mb-2 block text-xs font-extrabold uppercase tracking-wider text-slate-400">
+                    Nom du client
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="ex : Martin Sophie"
+                    value={clientName}
+                    onChange={(e) => setClientName(e.target.value)}
+                    className="w-full rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] px-4 py-3.5 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-xs font-extrabold uppercase tracking-wider text-slate-400">
+                    Nom du dossier
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="ex : Achat appartement Lyon"
+                    value={dossierName}
+                    onChange={(e) => setDossierName(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleGenerate()}
+                    className="w-full rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] px-4 py-3.5 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                  />
+                </div>
+
+                <button
+                  onClick={handleGenerate}
+                  disabled={!clientName || !dossierName}
+                  className="w-full rounded-2xl bg-[linear-gradient(135deg,#4F46E5_0%,#6366F1_60%,#7C3AED_100%)] px-6 py-4 text-sm font-extrabold text-white shadow-[0_8px_20px_rgba(79,70,229,0.22)] transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Générer le lien client →
+                </button>
+              </div>
+            </div>
+          )}
+
+          {step === "link" && (
+            <div className="mx-auto w-full max-w-md text-center">
+              <div className="mb-4 inline-flex size-16 items-center justify-center rounded-full border border-emerald-100 bg-emerald-50 text-3xl">
+                🔗
+              </div>
+              <h3 className="mb-1 text-xl font-extrabold text-slate-800">
+                Lien généré !
+              </h3>
+              <p className="mb-6 text-sm font-semibold text-slate-400">
+                Envoyez-le à votre client par email, SMS ou WhatsApp.
+              </p>
+
+              <div className="mb-4 rounded-2xl border border-indigo-100 bg-indigo-50 p-4 text-left">
+                <div className="mb-2 text-xs font-extrabold uppercase tracking-wider text-indigo-400">
+                  Dossier créé
+                </div>
+                <div className="mb-1 text-sm font-extrabold text-slate-800">
+                  {dossierName || "Achat appartement Lyon"}
+                </div>
+                <div className="text-xs font-semibold text-slate-500">
+                  Client : {clientName || "Martin Sophie"}
+                </div>
+              </div>
+
+              <div className="mb-6 flex items-center gap-3 rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] p-4">
+                <div className="flex-1 truncate text-left text-xs font-semibold text-slate-500">
+                  {link}
+                </div>
+                <button className="flex-shrink-0 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-extrabold text-white transition hover:bg-indigo-700">
+                  Copier
+                </button>
+              </div>
+
+              <button
+                onClick={() => setStep("client")}
+                className="w-full rounded-2xl border border-[#E2E8F0] bg-white px-6 py-3.5 text-sm font-extrabold text-slate-700 transition hover:bg-slate-50"
+              >
+                Voir ce que voit votre client →
+              </button>
+            </div>
+          )}
+
+          {step === "client" && (
+            <div className="mx-auto w-full max-w-md">
+              <div className="mb-6 text-center">
+                <span className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-xs font-extrabold text-emerald-600">
+                  <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Vue client — accès par lien unique
+                </span>
+              </div>
+
+              <div className="mb-4 rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] p-5">
+                <div className="mb-4 flex items-start justify-between">
+                  <div>
+                    <div className="text-base font-extrabold">
+                      {dossierName || "Achat appartement Lyon"}
+                    </div>
+                    <div className="mt-0.5 text-xs font-semibold text-slate-400">
+                      Client : {clientName || "Martin Sophie"}
+                    </div>
+                  </div>
+                  <div className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-extrabold text-indigo-600 ring-1 ring-indigo-100">
+                    En cours
+                  </div>
+                </div>
+
+                <div className="mb-5">
+                  <div className="mb-2 flex justify-between">
+                    <span className="text-xs font-semibold text-slate-500">
+                      Progression
+                    </span>
+                    <span className="text-xs font-extrabold text-indigo-600">
+                      {progress}%
+                    </span>
+                  </div>
+                  <div className="h-3 w-full overflow-hidden rounded-full bg-slate-200">
+                    <div
+                      className="h-full rounded-full bg-[linear-gradient(90deg,#4F46E5,#7C3AED)] transition-all duration-700"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="mb-5 space-y-2">
+                  {dossierSteps.map((s, i) => (
+                    <div
+                      key={s}
+                      className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition ${
+                        i === activeStep
+                          ? "border border-indigo-100 bg-indigo-50"
+                          : "border border-[#E2E8F0] bg-white"
+                      }`}
+                    >
+                      <div
+                        className={`flex size-6 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-extrabold ${
+                          i < activeStep
+                            ? "bg-indigo-600 text-white"
+                            : i === activeStep
+                            ? "border-2 border-indigo-400 bg-indigo-100 text-indigo-600"
+                            : "bg-slate-100 text-slate-300"
+                        }`}
+                      >
+                        {i < activeStep ? "✓" : i + 1}
+                      </div>
+
+                      <span
+                        className={`text-xs font-semibold ${
+                          i < activeStep
+                            ? "text-slate-400 line-through"
+                            : i === activeStep
+                            ? "font-extrabold text-slate-800"
+                            : "text-slate-300"
+                        }`}
+                      >
+                        {s}
+                      </span>
+
+                      {i === activeStep && (
+                        <span className="ml-auto text-[10px] font-extrabold text-indigo-500">
+                          En cours
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {activeStep < dossierSteps.length - 1 ? (
+                  <button
+                    onClick={handleAdvance}
+                    className="w-full rounded-xl border border-indigo-200 bg-white px-4 py-2.5 text-xs font-extrabold text-indigo-600 transition hover:bg-indigo-50"
+                  >
+                    ↗ Simuler une mise à jour (côté pro)
+                  </button>
+                ) : (
+                  <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-center">
+                    <span className="text-xs font-extrabold text-emerald-600">
+                      🎉 Dossier clôturé !
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <p className="text-center text-xs font-semibold text-slate-400">
+                C&apos;est exactement ce que voit votre client sur son téléphone.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function HomePage() {
   return (
-    <main className="min-h-screen bg-[#F8FAFC] text-slate-900">
-      {/* Subtle background glow */}
-      <div aria-hidden className="fixed inset-0 -z-10">
+    <main className="min-h-screen text-slate-900">
+      <div aria-hidden className="fixed inset-0 -z-10 overflow-hidden">
         <div className="absolute inset-0 bg-[#F8FAFC]" />
-        <div className="absolute -top-40 left-1/2 h-[560px] w-[560px] -translate-x-1/2 rounded-full blur-3xl opacity-35 bg-[radial-gradient(circle,rgba(79,70,229,0.18),transparent_60%)]" />
-        <div className="absolute top-32 -left-40 h-[480px] w-[480px] rounded-full blur-3xl opacity-25 bg-[radial-gradient(circle,rgba(13,148,136,0.14),transparent_60%)]" />
-        <div className="absolute -bottom-60 right-[-120px] h-[560px] w-[560px] rounded-full blur-3xl opacity-20 bg-[radial-gradient(circle,rgba(124,58,237,0.12),transparent_60%)]" />
+        <div className="absolute -top-40 left-1/2 h-[600px] w-[600px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(79,70,229,0.18),transparent_60%)] opacity-25 blur-3xl" />
+        <div className="absolute -left-60 top-1/2 h-[500px] w-[500px] rounded-full bg-[radial-gradient(circle,rgba(13,148,136,0.12),transparent_60%)] opacity-15 blur-3xl" />
+      </div>
+
+      {/* BANNER */}
+      <div className="bg-indigo-600 px-4 py-2.5 text-center text-xs font-extrabold tracking-wide text-white">
+        🎁 1 dossier offert à l&apos;inscription — aucune carte bancaire requise
       </div>
 
       {/* NAVBAR */}
       <header className="sticky top-0 z-20">
         <div className="mx-auto max-w-6xl px-6 pt-4">
-          <div className="rounded-2xl border border-[#E2E8F0] bg-white/70 backdrop-blur-md shadow-[0_12px_40px_rgba(15,23,42,0.06)]">
+          <div className="rounded-2xl border border-[#E2E8F0] bg-white/80 shadow-[0_8px_32px_rgba(15,23,42,0.06)] backdrop-blur-md">
             <div className="flex items-center justify-between px-5 py-3">
-              {/* Logo */}
               <div className="flex items-center gap-3">
-                <div className="flex size-9 items-center justify-center rounded-xl bg-indigo-600 text-white font-extrabold shadow-[0_10px_24px_rgba(79,70,229,0.22)]">
+                <div className="flex size-9 items-center justify-center rounded-xl bg-indigo-600 font-extrabold text-white shadow-[0_8px_20px_rgba(79,70,229,0.22)]">
                   P
                 </div>
                 <div className="leading-tight">
                   <div className="text-sm font-extrabold tracking-tight">
                     Progressive Pulse
                   </div>
-                  <div className="text-[11px] font-semibold text-slate-500">
+                  <div className="text-[11px] font-semibold text-slate-400">
                     Suivi de dossiers
                   </div>
                 </div>
               </div>
 
-              {/* Links */}
-              <nav className="hidden md:flex items-center gap-7">
-                <a
-                  href="#benefices"
-                  className="text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors"
-                >
-                  Bénéfices
-                </a>
-                <a
-                  href="/demo"
-                  className="text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors"
-                >
-                  Démo
-                </a>
-                <a
-                  href="#tarifs"
-                  className="text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors"
-                >
-                  Tarifs
-                </a>
+              <nav className="hidden items-center gap-6 md:flex">
+                {[
+                  ["Comment ça marche", "#how"],
+                  ["Métiers", "#metiers"],
+                  ["Tarifs", "#tarifs"],
+                  ["FAQ", "#faq"],
+                ].map(([label, href]) => (
+                  <a
+                    key={label}
+                    href={href}
+                    className="text-sm font-semibold text-slate-500 transition-colors hover:text-slate-900"
+                  >
+                    {label}
+                  </a>
+                ))}
               </nav>
 
-              {/* Actions */}
               <div className="flex items-center gap-3">
                 <a
                   href="/login"
-                  className="hidden sm:inline text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors"
+                  className="hidden text-sm font-semibold text-slate-500 transition-colors hover:text-slate-900 sm:inline"
                 >
                   Connexion
                 </a>
                 <a
-                  href="/login"
-                  className="inline-flex items-center justify-center rounded-xl px-5 py-2.5 text-sm font-extrabold text-white
-                             bg-[linear-gradient(135deg,#4F46E5_0%,#6366F1_60%,#7C3AED_100%)]
-                             shadow-[0_10px_24px_rgba(79,70,229,0.22)]
-                             transition-all duration-200 ease-out
-                             hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(79,70,229,0.28)]
-                             active:translate-y-[1px]"
+                  href="/signup"
+                  className="inline-flex items-center justify-center rounded-xl bg-[linear-gradient(135deg,#4F46E5_0%,#6366F1_60%,#7C3AED_100%)] px-5 py-2.5 text-sm font-extrabold text-white shadow-[0_8px_20px_rgba(79,70,229,0.22)] transition-all hover:-translate-y-0.5 hover:shadow-[0_14px_32px_rgba(79,70,229,0.28)]"
                 >
-                  Essayer
+                  Commencer gratuitement
                 </a>
               </div>
             </div>
@@ -79,267 +349,218 @@ export default function HomePage() {
       </header>
 
       {/* HERO */}
-      <section className="min-h-[92vh] flex items-center justify-center px-6">
-        <div className="w-full max-w-6xl">
-          <div className="text-center">
-            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-white px-4 py-2 shadow-sm">
-              <span className="size-2 rounded-full bg-indigo-600" />
-              <span className="text-xs font-extrabold uppercase tracking-wider text-slate-600">
-                Transparence client instantanée
-              </span>
-              <span className="ml-2 inline-flex items-center gap-2 rounded-full bg-orange-50 px-3 py-1 text-[11px] font-extrabold text-orange-700 ring-1 ring-orange-100">
-                Nouveau
-              </span>
-            </div>
-
-            <h1 className="mt-10 text-5xl md:text-6xl font-extrabold tracking-[-0.02em] leading-[1.06]">
-              Offrez une <span className="text-indigo-700">visibilité totale</span> à
-              vos clients.
-            </h1>
-
-            <p className="mt-8 text-xl font-semibold text-slate-600 max-w-3xl mx-auto leading-relaxed">
-              Moins de relances. Moins d’appels. Plus de confiance. Progressive Pulse
-              transforme chaque dossier en expérience pro.
-            </p>
-
-            <div className="mt-12 flex flex-col gap-4 sm:flex-row sm:justify-center">
-              <a
-                href="/demo"
-                className="rounded-2xl px-10 py-5 text-base font-extrabold text-white
-                           bg-[linear-gradient(135deg,#4F46E5_0%,#6366F1_60%,#7C3AED_100%)]
-                           shadow-[0_12px_28px_rgba(79,70,229,0.22)]
-                           transition-all duration-200 ease-out
-                           hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(79,70,229,0.28)]"
-              >
-                Démo
-              </a>
-
-              <a
-                href="#tarifs"
-                className="rounded-2xl border border-[#E2E8F0] bg-white px-10 py-5 text-base font-extrabold text-slate-800
-                           hover:bg-slate-50 transition"
-              >
-                Voir les tarifs
-              </a>
-            </div>
-
-            <div className="mt-12 flex items-center justify-center gap-4">
-              <div className="flex -space-x-2">
-                {["A", "M", "L", "S"].map((c) => (
-                  <div
-                    key={c}
-                    className="flex size-9 items-center justify-center rounded-full border-2 border-[#F8FAFC] bg-white text-sm font-extrabold text-slate-700 shadow-sm"
-                  >
-                    {c}
-                  </div>
-                ))}
-              </div>
-
-              <div className="text-base font-extrabold text-slate-700">
-                +50 pros utilisent Progressive Pulse
-              </div>
-            </div>
+      <section className="flex min-h-[90vh] items-center justify-center bg-[#F8FAFC] px-6 pb-20 pt-8">
+        <div className="w-full max-w-6xl text-center">
+          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-white px-4 py-2 shadow-sm">
+            <span className="size-2 rounded-full bg-indigo-600 animate-pulse" />
+            <span className="text-xs font-extrabold uppercase tracking-wider text-slate-600">
+              1 dossier offert à l&apos;inscription
+            </span>
           </div>
 
-          {/* Visual hero mockup */}
-          <div className="mt-16 sm:mt-20 relative">
-            <div className="mx-auto max-w-5xl relative">
-              {/* Floating status chips */}
-              <div className="pp-float absolute left-6 top-8 rounded-full bg-white px-3 py-2 text-xs font-extrabold text-slate-700 ring-1 ring-[#E2E8F0] shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
-                <span className="mr-2 inline-block size-2 rounded-full bg-emerald-500" />
-                Terminé
-              </div>
-              <div className="pp-float [animation-delay:250ms] absolute right-10 top-10 rounded-full bg-white px-3 py-2 text-xs font-extrabold text-slate-700 ring-1 ring-[#E2E8F0] shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
-                <span className="mr-2 inline-block size-2 rounded-full bg-indigo-600" />
-                En cours
-              </div>
-              <div className="pp-float [animation-delay:500ms] absolute left-10 bottom-10 rounded-full bg-white px-3 py-2 text-xs font-extrabold text-slate-700 ring-1 ring-[#E2E8F0] shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
-                <span className="mr-2 inline-block size-2 rounded-full bg-amber-500" />
-                Documents reçus
-              </div>
+          <h1 className="mx-auto mb-8 max-w-3xl text-5xl font-extrabold leading-[1.05] tracking-[-0.03em] md:text-[62px]">
+            Créez un dossier
+            <br />
+            <span className="text-indigo-600">en 10 secondes.</span>
+            <br />
+            <span className="text-slate-400">Votre client suit. Sans relancer.</span>
+          </h1>
 
-              {/* Mockup */}
-              <div className="rounded-3xl border border-[#E2E8F0] bg-white p-6 shadow-[0_30px_90px_rgba(15,23,42,0.10)]">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-full bg-slate-200" />
-                    <span className="h-2.5 w-2.5 rounded-full bg-slate-200" />
-                    <span className="h-2.5 w-2.5 rounded-full bg-slate-200" />
-                  </div>
-                  <div className="text-xs font-semibold text-slate-500">
-                    dashboard.progressivepulse.app
-                  </div>
-                  <div className="h-7 w-16 rounded-lg bg-slate-100 ring-1 ring-[#E2E8F0]" />
+          <p className="mx-auto mb-10 max-w-xl text-lg font-semibold leading-relaxed text-slate-500">
+            Nom du client, nom du dossier, lien généré. Votre client suit
+            l’avancement en temps réel, sans créer de compte.
+          </p>
+
+          <div className="mb-6 flex flex-col justify-center gap-3 sm:flex-row">
+            <a
+              href="/signup"
+              className="rounded-2xl bg-[linear-gradient(135deg,#4F46E5_0%,#6366F1_60%,#7C3AED_100%)] px-8 py-4 text-sm font-extrabold text-white shadow-[0_12px_28px_rgba(79,70,229,0.22)] transition-all hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(79,70,229,0.28)]"
+            >
+              🎁 Commencer gratuitement
+            </a>
+            <a
+              href="#demo"
+              className="rounded-2xl border border-[#E2E8F0] bg-white px-8 py-4 text-sm font-extrabold text-slate-700 transition hover:bg-slate-50"
+            >
+              ▶ Voir la démo en direct
+            </a>
+          </div>
+
+          <div className="mb-12 flex flex-wrap justify-center gap-x-6 gap-y-2">
+            {[
+              "Aucun abonnement",
+              "Crédits sans expiration",
+              "Aucun compte client requis",
+            ].map((item) => (
+              <span
+                key={item}
+                className="flex items-center gap-1.5 text-xs font-semibold text-slate-400"
+              >
+                <span className="text-indigo-500">✓</span>
+                {item}
+              </span>
+            ))}
+          </div>
+
+          <div className="flex items-center justify-center gap-3">
+            <div className="flex -space-x-2">
+              {["A", "M", "L", "S"].map((c) => (
+                <div
+                  key={c}
+                  className="flex size-9 items-center justify-center rounded-full border-2 border-[#F8FAFC] bg-white text-sm font-extrabold text-slate-700 shadow-sm"
+                >
+                  {c}
                 </div>
+              ))}
+            </div>
+            <span className="text-sm font-extrabold text-slate-600">
+              Déjà utilisé par des professionnels du suivi client
+            </span>
+          </div>
+        </div>
+      </section>
 
-                <div className="mt-6 grid gap-4 md:grid-cols-[0.9fr_1.1fr]">
-                  <div className="rounded-2xl border border-[#E2E8F0] bg-slate-50 p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm font-extrabold">Dossiers</div>
-                      <div className="text-xs font-semibold text-slate-500">
-                        Aujourd’hui
-                      </div>
-                    </div>
-
-                    <div className="mt-4 space-y-3">
-                      {[
-                        { name: "SCI Martin", value: 68 },
-                        { name: "Dossier Pereira", value: 38 },
-                        { name: "Dossier Nguyen", value: 100 },
-                      ].map((d) => (
-                        <div
-                          key={d.name}
-                          className="group rounded-2xl border border-[#E2E8F0] bg-white p-3 transition
-                                     hover:shadow-[0_16px_30px_rgba(15,23,42,0.06)]"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="text-xs font-extrabold text-slate-800">
-                              {d.name}
-                            </div>
-                            <div className="text-xs font-semibold text-slate-500 tabular-nums">
-                              {d.value}%
-                            </div>
-                          </div>
-
-                          <div className="mt-2 h-2 w-full rounded-full bg-slate-100 ring-1 ring-[#E2E8F0] overflow-hidden">
-                            <div
-                              className="h-full rounded-full bg-indigo-600 transition-all duration-500 group-hover:brightness-110"
-                              style={{ width: `${d.value}%` }}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-[#E2E8F0] bg-slate-50 p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm font-extrabold">Vue client</div>
-                      <div className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-extrabold text-emerald-700 ring-1 ring-emerald-100">
-                        Lien public
-                      </div>
-                    </div>
-
-                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="rounded-2xl border border-[#E2E8F0] bg-white p-4">
-                        <div className="text-xs font-semibold text-slate-500">
-                          Statut actuel
-                        </div>
-                        <div className="mt-2 text-sm font-extrabold">
-                          En attente de validation
-                        </div>
-
-                        <div className="mt-4 group">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-semibold text-slate-600">
-                              Progression
-                            </span>
-                            <span className="text-xs font-semibold text-slate-500">
-                              68%
-                            </span>
-                          </div>
-                          <div className="h-2 w-full rounded-full bg-slate-100 ring-1 ring-[#E2E8F0] overflow-hidden">
-                            <div className="h-full w-[68%] rounded-full bg-indigo-600 transition-all duration-500 group-hover:w-[72%]" />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="rounded-2xl border border-[#E2E8F0] bg-white p-4">
-                        <div className="text-xs font-semibold text-slate-500">
-                          Prochaine étape
-                        </div>
-                        <div className="mt-2 text-sm font-extrabold">
-                          Dépôt effectué
-                        </div>
-
-                        <div className="mt-4 group">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-semibold text-slate-600">
-                              Avancement
-                            </span>
-                            <span className="text-xs font-semibold text-slate-500">
-                              38%
-                            </span>
-                          </div>
-                          <div className="h-2 w-full rounded-full bg-slate-100 ring-1 ring-[#E2E8F0] overflow-hidden">
-                            <div className="h-full w-[38%] rounded-full bg-indigo-600 transition-all duration-500 group-hover:w-[45%]" />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="sm:col-span-2 rounded-2xl border border-[#E2E8F0] bg-white p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="text-xs font-semibold text-slate-500">
-                            Barre de confiance
-                          </div>
-                          <div className="text-xs font-semibold text-slate-500">
-                            hover
-                          </div>
-                        </div>
-                        <div className="mt-3 group">
-                          <div className="h-2 w-full rounded-full bg-slate-100 ring-1 ring-[#E2E8F0] overflow-hidden">
-                            <div className="h-full w-[66%] rounded-full bg-[linear-gradient(135deg,#4F46E5_0%,#6366F1_60%,#7C3AED_100%)] transition-all duration-500 group-hover:w-[72%]" />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+      {/* STATS */}
+      <section className="border-y border-[#E2E8F0] bg-white px-6 py-12">
+        <div className="mx-auto grid max-w-4xl grid-cols-2 gap-8 md:grid-cols-4">
+          {[
+            { num: "10s", label: "pour créer un dossier" },
+            { num: "1 lien", label: "pour informer le client" },
+            { num: "0€", label: "pour démarrer" },
+            { num: "Sans compte", label: "côté client" },
+          ].map((stat) => (
+            <div key={stat.label} className="text-center">
+              <div className="text-3xl font-extrabold tracking-tight text-indigo-600">
+                {stat.num}
               </div>
+              <div className="mt-1 text-xs font-semibold text-slate-500">
+                {stat.label}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
 
+      {/* PROBLÈME */}
+      <section className="bg-[#F8FAFC] px-6 py-24">
+        <div className="mx-auto max-w-6xl">
+          <div className="mb-14 max-w-xl">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-red-100 bg-red-50 px-4 py-1.5">
+              <span className="text-xs font-extrabold uppercase tracking-wider text-red-500">
+                Le problème
+              </span>
+            </div>
+            <h2 className="text-3xl font-extrabold leading-tight tracking-tight sm:text-4xl">
+              Gérer un dossier client
+              <br />
+              est souvent <span className="text-red-400">chaotique</span>.
+            </h2>
+          </div>
+
+          <div className="mb-10 grid gap-5 md:grid-cols-2">
+            {[
+              {
+                emoji: "📞",
+                title: '"Où en est mon dossier ?" — encore',
+                desc: "Le 5ème appel de la semaine. Vos clients ne savent pas où vous en êtes, alors ils appellent.",
+              },
+              {
+                emoji: "📎",
+                title: "Des documents qui n'arrivent jamais au bon endroit",
+                desc: "Email, WhatsApp, SMS… les pièces se perdent et vous passez votre temps à les chercher.",
+              },
+              {
+                emoji: "📂",
+                title: "Aucune visibilité pour le client",
+                desc: "Sans suivi clair, le client se sent dans le flou. Le flou génère de la méfiance.",
+              },
+              {
+                emoji: "🔁",
+                title: "Des relances qui mangent votre journée",
+                desc: "Chaque heure passée à relancer est une heure de moins sur vos vrais dossiers.",
+              },
+            ].map((item) => (
               <div
-                aria-hidden
-                className="pointer-events-none absolute -inset-8 -z-10 rounded-[40px]
-                           bg-[radial-gradient(circle_at_30%_20%,rgba(79,70,229,0.12),transparent_55%),radial-gradient(circle_at_70%_80%,rgba(13,148,136,0.10),transparent_55%)]
-                           blur-2xl"
-              />
+                key={item.title}
+                className="flex items-start gap-4 rounded-2xl border border-[#E2E8F0] bg-white p-6 shadow-[0_4px_24px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:shadow-md"
+              >
+                <div className="mt-0.5 flex-shrink-0 text-2xl">{item.emoji}</div>
+                <div>
+                  <div className="mb-1 text-sm font-extrabold text-slate-800">
+                    {item.title}
+                  </div>
+                  <p className="text-sm font-semibold leading-relaxed text-slate-500">
+                    {item.desc}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex justify-center">
+            <div className="max-w-xl rounded-2xl border border-indigo-100 bg-indigo-50 px-8 py-5 text-center">
+              <p className="text-sm font-extrabold text-indigo-700">
+                Progressive Pulse centralise tout dans un seul lien client —
+                généré en 10 secondes.
+              </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* BENEFITS */}
-      <section id="benefices" className="bg-white px-6 py-24">
+      {/* COMMENT ÇA MARCHE */}
+      <section id="how" className="bg-white px-6 py-24">
         <div className="mx-auto max-w-6xl">
-          <div className="max-w-2xl">
-            <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
-              Valorisez votre relation client.
+          <div className="mx-auto mb-14 max-w-xl text-center">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-4 py-1.5">
+              <span className="text-xs font-extrabold uppercase tracking-wider text-indigo-600">
+                Simplicité
+              </span>
+            </div>
+            <h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
+              3 étapes. C&apos;est tout.
             </h2>
-            <p className="mt-5 text-slate-600 font-semibold leading-relaxed">
-              Un client informé est un client serein. Et un client serein recommande.
+            <p className="mt-4 font-semibold leading-relaxed text-slate-500">
+              Pas de formation, pas de complexité. Opérationnel en moins de 10
+              secondes.
             </p>
           </div>
 
-          <div className="mt-14 grid gap-6 md:grid-cols-3">
+          <div className="grid gap-6 md:grid-cols-3">
             {[
               {
-                title: "Réduction des appels",
-                desc: "Le client voit l’avancement. Tu reprends ton temps et ta concentration.",
+                num: "01",
+                icon: "✏️",
+                title: "Créez un dossier",
+                desc: "Nom du client + nom du dossier. Deux champs. Moins de 10 secondes. C'est tout.",
               },
               {
-                title: "Satisfaction client",
-                desc: "Une expérience claire et pro. Moins de stress, plus de confiance.",
+                num: "02",
+                icon: "🔗",
+                title: "Envoyez le lien",
+                desc: "Un lien unique est généré. Envoyez-le par email, SMS ou WhatsApp. Votre client l'ouvre sans compte.",
               },
               {
-                title: "Image de marque",
-                desc: "Tu passes en mode structuré. Tes clients sentent la différence.",
+                num: "03",
+                icon: "📊",
+                title: "Mettez à jour les étapes",
+                desc: "Vous avancez le dossier côté pro. Le client voit la progression en temps réel, sans vous appeler.",
               },
-            ].map((c) => (
+            ].map((item) => (
               <div
-                key={c.title}
-                className="rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] p-7
-                           shadow-[0_20px_60px_rgba(15,23,42,0.06)]
-                           transition-all duration-200 ease-out
-                           hover:-translate-y-1 hover:shadow-[0_28px_80px_rgba(15,23,42,0.09)]"
+                key={item.num}
+                className="relative overflow-hidden rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] p-7 shadow-[0_4px_24px_rgba(15,23,42,0.04)] transition hover:-translate-y-1 hover:shadow-md"
               >
-                <div className="flex items-center gap-3">
-                  <div className="flex size-10 items-center justify-center rounded-2xl bg-indigo-600/10 text-indigo-700 font-extrabold ring-1 ring-indigo-200">
-                    ✓
-                  </div>
-                  <div className="text-lg font-extrabold">{c.title}</div>
+                <div className="absolute bottom-2 right-3 select-none text-[80px] font-extrabold leading-none text-slate-100">
+                  {item.num}
                 </div>
-                <p className="mt-4 text-sm font-semibold text-slate-600 leading-relaxed">
-                  {c.desc}
+                <div className="mb-5 text-3xl">{item.icon}</div>
+                <div className="mb-2 text-xs font-extrabold uppercase tracking-widest text-indigo-500">
+                  {item.num}
+                </div>
+                <h3 className="mb-2 text-lg font-extrabold">{item.title}</h3>
+                <p className="text-sm font-semibold leading-relaxed text-slate-500">
+                  {item.desc}
                 </p>
               </div>
             ))}
@@ -347,279 +568,808 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* DEMO */}
-      <section id="demo" className="px-6 py-24 bg-[#F8FAFC]">
-        <div className="mx-auto max-w-6xl grid gap-12 md:grid-cols-[.95fr_1.05fr] md:items-start">
-          <div className="rounded-3xl border border-[#E2E8F0] bg-white p-8 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
-            <div className="text-xs font-extrabold uppercase tracking-widest text-slate-400">
-              Aperçu interface
+      {/* DÉMO */}
+      <section id="demo" className="bg-[#F0F4FF] px-6 py-24">
+        <div className="mx-auto max-w-6xl">
+          <div className="mx-auto mb-12 max-w-xl text-center">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-white px-4 py-1.5">
+              <span className="text-xs font-extrabold uppercase tracking-wider text-indigo-600">
+                Démo en direct
+              </span>
             </div>
-
-            <div className="mt-7 mx-auto max-w-[420px] rounded-2xl overflow-hidden border border-slate-200 shadow-sm">
-              <Image
-                src="/images/mockup-demo.png"
-                alt="Interface Progressive Pulse"
-                width={600}
-                height={900}
-                className="w-full h-auto"
-              />
-            </div>
-
-            <p className="mt-6 text-sm font-semibold text-slate-600 leading-relaxed">
-              Ta page client ressemble à une app. Simple. Pro. Lisible.
+            <h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
+              Essayez maintenant.
+              <br />
+              <span className="text-indigo-600">Sans créer de compte.</span>
+            </h2>
+            <p className="mt-4 font-semibold leading-relaxed text-slate-500">
+              Créez un vrai dossier, générez un vrai lien, voyez exactement ce
+              que voit votre client.
             </p>
-
-            <div className="mt-8">
-              <a
-                href="/demo"
-                className="inline-flex w-full items-center justify-center rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] px-6 py-4 text-sm font-extrabold text-slate-800 hover:bg-slate-50 transition"
-              >
-                Ouvrir la démo
-              </a>
-            </div>
           </div>
 
+          <InteractiveDemo />
+        </div>
+      </section>
+
+      {/* DOCUMENTS */}
+      <section className="bg-white px-6 py-24">
+        <div className="mx-auto grid max-w-6xl items-center gap-12 md:grid-cols-2">
           <div>
-            <h3 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
-              Simple à mettre en place. <span className="text-indigo-700">Redoutable</span> au quotidien.
-            </h3>
-            <p className="mt-5 text-slate-600 font-semibold max-w-xl leading-relaxed">
-              Tu crées un dossier, tu envoies un lien, tu mets à jour les étapes. Le client suit.
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-4 py-1.5">
+              <span className="text-xs font-extrabold uppercase tracking-wider text-indigo-600">
+                Documents
+              </span>
+            </div>
+            <h2 className="mb-5 text-3xl font-extrabold tracking-tight sm:text-4xl">
+              Récupérez les documents
+              <br />
+              <span className="text-indigo-600">
+                sans courir après vos clients
+              </span>
+              .
+            </h2>
+            <p className="mb-8 font-semibold leading-relaxed text-slate-500">
+              Votre client reçoit un lien unique, suit son dossier et vous
+              transmet les documents attendus simplement, sans créer de compte.
             </p>
 
-            <div className="mt-12 space-y-5">
+            <div className="space-y-4">
               {[
-                {
-                  title: "Barre de progression automatique",
-                  desc: "Chaque mise à jour d’étape ajuste le statut et le %.",
-                },
-                {
-                  title: "Collecte de documents",
-                  desc: "Le client dépose ses fichiers directement sur son dossier.",
-                },
-                {
-                  title: "Contact direct & feedback",
-                  desc: "Le client contacte le pro sans friction (mail / téléphone).",
-                },
-              ].map((x) => (
-                <div
-                  key={x.title}
-                  className="rounded-3xl border border-[#E2E8F0] bg-white p-7 shadow-[0_20px_60px_rgba(15,23,42,0.06)]"
-                >
-                  <div className="flex items-start gap-4">
-                    <div className="mt-0.5 flex size-10 items-center justify-center rounded-2xl bg-indigo-600/10 text-indigo-700 font-extrabold ring-1 ring-indigo-200">
-                      ●
-                    </div>
-                    <div>
-                      <div className="text-lg font-extrabold">{x.title}</div>
-                      <p className="mt-2 text-sm font-semibold text-slate-600 leading-relaxed">
-                        {x.desc}
-                      </p>
-                    </div>
+                "Moins d’allers-retours par email",
+                "Moins de pièces perdues dans WhatsApp ou les SMS",
+                "Un dossier plus vite complet",
+              ].map((item) => (
+                <div key={item} className="flex items-center gap-3">
+                  <div className="flex size-7 items-center justify-center rounded-full bg-indigo-600 text-xs font-extrabold text-white">
+                    ✓
                   </div>
+                  <span className="text-sm font-semibold text-slate-700">
+                    {item}
+                  </span>
                 </div>
               ))}
             </div>
+          </div>
 
-            <div className="mt-12 rounded-3xl border border-indigo-200 bg-white p-7 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
-              <p className="text-sm font-semibold text-slate-700 leading-relaxed">
-                “Depuis qu’on envoie le lien de suivi, les clients arrêtent de relancer. Ils voient l’avancement. Ça change tout.”
+          <div className="rounded-3xl border border-[#E2E8F0] bg-[#F8FAFC] p-8 shadow-[0_4px_24px_rgba(15,23,42,0.05)]">
+            <div className="mb-4 rounded-2xl border border-[#E2E8F0] bg-white p-5">
+              <div className="mb-3 flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-extrabold text-slate-800">
+                    Pièces demandées
+                  </div>
+                  <div className="text-xs font-semibold text-slate-400">
+                    Dossier en cours
+                  </div>
+                </div>
+                <div className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-extrabold text-indigo-600 ring-1 ring-indigo-100">
+                  2 reçues / 4
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {[
+                  { label: "Pièce d’identité", status: "Reçu" },
+                  { label: "Justificatif de domicile", status: "Reçu" },
+                  { label: "Bulletins de salaire", status: "En attente" },
+                  { label: "Avis d’imposition", status: "En attente" },
+                ].map((doc) => (
+                  <div
+                    key={doc.label}
+                    className="flex items-center justify-between rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] px-4 py-3"
+                  >
+                    <span className="text-sm font-semibold text-slate-700">
+                      {doc.label}
+                    </span>
+                    <span
+                      className={`text-xs font-extrabold ${
+                        doc.status === "Reçu"
+                          ? "text-emerald-600"
+                          : "text-amber-500"
+                      }`}
+                    >
+                      {doc.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <p className="text-center text-xs font-semibold text-slate-400">
+              Une vue simple pour le client. Moins de relances pour vous.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* FONCTIONNALITÉS */}
+      <section className="bg-white px-6 py-24">
+        <div className="mx-auto max-w-6xl">
+          <div className="grid items-center gap-12 md:grid-cols-2">
+            <div>
+              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-4 py-1.5">
+                <span className="text-xs font-extrabold uppercase tracking-wider text-indigo-600">
+                  Fonctionnalités
+                </span>
+              </div>
+              <h2 className="mb-5 text-3xl font-extrabold tracking-tight sm:text-4xl">
+                Simple, rapide,
+                <br />
+                <span className="text-indigo-600">efficace</span>.
+              </h2>
+              <p className="mb-8 font-semibold leading-relaxed text-slate-500">
+                Progressive Pulse simplifie le suivi client : un dossier créé en
+                quelques secondes, un lien partagé, une progression visible sans
+                relance.
               </p>
-              <div className="mt-3 text-xs font-extrabold uppercase tracking-widest text-slate-400">
-                — Dimitri - Courtier
+
+              <div className="space-y-5">
+                {[
+                  {
+                    icon: "⚡",
+                    title: "Dossier créé en moins de 10 secondes",
+                    desc: "Deux champs. Un lien généré. Aucune configuration. Vous êtes opérationnel immédiatement.",
+                  },
+                  {
+                    icon: "🔗",
+                    title: "Lien unique par dossier",
+                    desc: "Chaque dossier a son propre lien sécurisé. Votre client y accède sans compte ni mot de passe.",
+                  },
+                  {
+                    icon: "📊",
+                    title: "Barre de progression dynamique",
+                    desc: "Vous mettez à jour une étape côté pro — la barre avance côté client, en temps réel.",
+                  },
+                  {
+                    icon: "📧",
+                    title: "Documents envoyés par mail sécurisé",
+                    desc: "Votre client peut vous envoyer des documents via un lien sécurisé. Vous les recevez directement par email.",
+                  },
+                  {
+                    icon: "📅",
+                    title: "Récap hebdomadaire le lundi matin",
+                    desc: "Chaque lundi, vous recevez un email avec tous vos dossiers en cours — pour ne rien oublier de mettre à jour.",
+                  },
+                ].map((item) => (
+                  <div key={item.title} className="flex items-start gap-4">
+                    <div className="flex size-10 flex-shrink-0 items-center justify-center rounded-2xl bg-indigo-600/10 text-lg">
+                      {item.icon}
+                    </div>
+                    <div>
+                      <div className="mb-0.5 text-sm font-extrabold">
+                        {item.title}
+                      </div>
+                      <p className="text-sm font-semibold leading-relaxed text-slate-500">
+                        {item.desc}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-5">
+              <div className="rounded-3xl border border-[#E2E8F0] bg-[#F8FAFC] p-8 shadow-[0_4px_24px_rgba(15,23,42,0.05)]">
+                <div className="mb-6 text-xs font-extrabold uppercase tracking-widest text-slate-400">
+                  Résultats observés
+                </div>
+                <div className="space-y-4">
+                  {[
+                    {
+                      icon: "📞",
+                      label: "Relances client",
+                      value: "Moins fréquentes",
+                    },
+                    {
+                      icon: "⏱️",
+                      label: "Création du dossier",
+                      value: "10 sec",
+                    },
+                    {
+                      icon: "📂",
+                      label: "Suivi du dossier",
+                      value: "Plus clair",
+                    },
+                    {
+                      icon: "⭐",
+                      label: "Perception client",
+                      value: "Plus professionnelle",
+                    },
+                  ].map((item) => (
+                    <div
+                      key={item.label}
+                      className="flex items-center gap-4 rounded-2xl border border-[#E2E8F0] bg-white p-4"
+                    >
+                      <span className="text-xl">{item.icon}</span>
+                      <span className="flex-1 text-sm font-semibold text-slate-600">
+                        {item.label}
+                      </span>
+                      <span className="text-sm font-extrabold text-indigo-600">
+                        {item.value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-3xl border border-indigo-100 bg-indigo-50 p-7">
+                <p className="mb-4 text-sm font-semibold italic leading-relaxed text-slate-700">
+                  &quot;Depuis qu&apos;on envoie le lien de suivi, les clients
+                  arrêtent de relancer. Ils voient l&apos;avancement. Ça change
+                  tout.&quot;
+                </p>
+                <div className="flex items-center gap-3">
+                  <div className="flex size-8 items-center justify-center rounded-full bg-indigo-200 text-xs font-extrabold text-indigo-700">
+                    D
+                  </div>
+                  <div>
+                    <div className="text-xs font-extrabold text-slate-700">
+                      Dimitri
+                    </div>
+                    <div className="text-xs font-semibold text-slate-400">
+                      Courtier en financement
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* PRICING */}
-      <section id="tarifs" className="bg-white px-6 py-24">
+      {/* MÉTIERS */}
+      <section id="metiers" className="bg-[#F8FAFC] px-6 py-24">
         <div className="mx-auto max-w-6xl">
-          <div className="max-w-2xl">
-            <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
-              Tarif de lancement.
+          <div className="mx-auto mb-14 max-w-xl text-center">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-white px-4 py-1.5">
+              <span className="text-xs font-extrabold uppercase tracking-wider text-indigo-600">
+                Métiers
+              </span>
+            </div>
+            <h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
+              Conçu pour les pros qui gèrent
+              <br />
+              des <span className="text-indigo-600">dossiers clients</span>.
             </h2>
-            <p className="mt-5 text-slate-600 font-semibold leading-relaxed">
-              Zéro abonnement mensuel. Tu payes uniquement tes crédits.
+          </div>
+
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              {
+                emoji: "🏠",
+                title: "Agents immobiliers",
+                desc: "Suivez chaque vente ou location de A à Z. Votre client voit chaque étape sans vous appeler.",
+                tags: ["Mandat", "Compromis", "Acte de vente"],
+              },
+              {
+                emoji: "💰",
+                title: "Courtiers",
+                desc: "Montrez l'avancement du dossier de financement en temps réel. Fini le téléphone qui sonne.",
+                tags: ["Étude", "Accord", "Offre de prêt"],
+              },
+              {
+                emoji: "🛠️",
+                title: "Artisans & BTP",
+                desc: "Informez vos clients de l'avancement du chantier à chaque étape clé.",
+                tags: ["Devis", "Travaux", "Réception"],
+              },
+              {
+                emoji: "💼",
+                title: "Freelances",
+                desc: "Donnez une visibilité totale sur l'avancement du projet. Plus de questions incessantes.",
+                tags: ["Brief", "Production", "Livraison"],
+              },
+            ].map((item) => (
+              <div
+                key={item.title}
+                className="rounded-2xl border border-[#E2E8F0] bg-white p-6 shadow-[0_4px_24px_rgba(15,23,42,0.04)] transition hover:-translate-y-1 hover:shadow-md"
+              >
+                <div className="mb-4 text-3xl">{item.emoji}</div>
+                <h3 className="mb-2 text-base font-extrabold">{item.title}</h3>
+                <p className="mb-4 text-sm font-semibold leading-relaxed text-slate-500">
+                  {item.desc}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {item.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="rounded-full border border-[#E2E8F0] bg-[#F8FAFC] px-2.5 py-1 text-[11px] font-semibold text-slate-500"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ROI */}
+      <section className="bg-white px-6 py-24">
+        <div className="mx-auto max-w-6xl">
+          <div className="mx-auto mb-14 max-w-xl text-center">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-4 py-1.5">
+              <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-600">
+                Rentabilité
+              </span>
+            </div>
+            <h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
+              Un coût <span className="text-indigo-600">invisible</span>
+              <br />
+              face à votre commission.
+            </h2>
+            <p className="mt-4 font-semibold leading-relaxed text-slate-500">
+              Vous payez uniquement quand vous avez un vrai dossier à traiter.
+              Pas d’abonnement à vide, pas de coût fixe inutile.
             </p>
           </div>
 
-          <div className="mt-14 grid gap-6 md:grid-cols-2 md:items-start">
-            <div className="rounded-3xl border border-[#E2E8F0] bg-[#F8FAFC] p-7 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
-              <div className="text-sm font-extrabold">Single</div>
-              <div className="mt-2 text-sm font-semibold text-slate-600">
-                1 dossier unique — pour tester
+          <div className="mb-10 flex flex-col items-center gap-4 rounded-2xl border border-indigo-100 bg-indigo-50 p-6 sm:flex-row">
+            <div className="flex-1">
+              <p className="mb-1 text-sm font-extrabold text-indigo-800">
+                Pas d’abonnement à vide.
+              </p>
+              <p className="text-sm font-semibold leading-relaxed text-indigo-600">
+                Vous utilisez l’outil uniquement quand vous en avez besoin. Le
+                coût reste très faible face à la valeur d’un dossier signé ou
+                traité.
+              </p>
+            </div>
+            <div className="flex-shrink-0 rounded-2xl bg-indigo-600 px-6 py-3 text-center">
+              <div className="text-lg font-extrabold text-white">
+                Coût maîtrisé
               </div>
-              <div className="mt-7 flex items-end gap-2">
-                <div className="text-5xl font-extrabold tracking-tight">49€</div>
-                <div className="pb-2 text-sm font-extrabold text-slate-600">HT</div>
-              </div>
+            </div>
+          </div>
 
-              <div className="mt-7 space-y-3 text-sm font-semibold text-slate-700">
+          <div className="overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white shadow-[0_4px_24px_rgba(15,23,42,0.06)]">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-[#E2E8F0] bg-slate-50">
+                  {[
+                    "Métier",
+                    "Gain moyen / dossier",
+                    "Coût du suivi",
+                    "Représente",
+                  ].map((head) => (
+                    <th
+                      key={head}
+                      className="px-6 py-4 text-left text-xs font-extrabold uppercase tracking-wider text-slate-400"
+                    >
+                      {head}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
                 {[
-                  "Accès client illimité",
-                  "Barre de progression dynamique",
-                  "Stockage sécurisé",
-                  "Support pro",
-                ].map((x) => (
-                  <div key={x} className="flex items-center gap-3">
-                    <span className="mt-0.5 size-2 rounded-full bg-indigo-600" />
-                    {x}
-                  </div>
+                  {
+                    m: "🏠 Agent immobilier",
+                    g: "5 000€ – 15 000€",
+                    c: "19€",
+                    r: "0,1% à 0,4% du gain",
+                  },
+                  {
+                    m: "💰 Courtier",
+                    g: "2 000€ – 4 000€",
+                    c: "19€",
+                    r: "0,5% à 1% du gain",
+                  },
+                  {
+                    m: "🛠️ Artisan",
+                    g: "1 500€ – 8 000€",
+                    c: "19€",
+                    r: "0,2% à 1,3% du gain",
+                  },
+                  {
+                    m: "💼 Freelance",
+                    g: "500€ – 3 000€",
+                    c: "19€",
+                    r: "0,6% à 3,8% du gain",
+                  },
+                ].map((row, i) => (
+                  <tr
+                    key={row.m}
+                    className={`border-b border-[#E2E8F0] transition hover:bg-slate-50 ${
+                      i % 2 !== 0 ? "bg-[#FAFBFC]" : ""
+                    }`}
+                  >
+                    <td className="px-6 py-4 text-sm font-extrabold">{row.m}</td>
+                    <td className="px-6 py-4 text-sm font-semibold text-slate-600">
+                      {row.g}
+                    </td>
+                    <td className="px-6 py-4 text-sm font-extrabold text-indigo-600">
+                      {row.c}
+                    </td>
+                    <td className="px-6 py-4 text-sm font-semibold text-slate-400">
+                      {row.r}
+                    </td>
+                  </tr>
                 ))}
-              </div>
+              </tbody>
+            </table>
+          </div>
 
+          <p className="mt-8 text-center font-semibold italic text-slate-500">
+            &quot;Un seul dossier rentable rembourse largement l&apos;outil.{" "}
+            <span className="font-extrabold not-italic text-indigo-600">
+              Le calcul est vite fait.
+            </span>
+            &quot;
+          </p>
+        </div>
+      </section>
+
+      {/* PRICING */}
+      <section id="tarifs" className="bg-[#F8FAFC] px-6 py-24">
+        <div className="mx-auto max-w-6xl">
+          <div className="mx-auto mb-14 max-w-xl text-center">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-white px-4 py-1.5">
+              <span className="text-xs font-extrabold uppercase tracking-wider text-indigo-600">
+                Tarifs
+              </span>
+            </div>
+            <h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
+              Payez uniquement
+              <br />
+              quand vous <span className="text-indigo-600">travaillez</span>.
+            </h2>
+            <p className="mt-4 font-semibold leading-relaxed text-slate-500">
+              Zéro abonnement. Zéro frais fixe. Des crédits qui n&apos;expirent
+              jamais.
+            </p>
+            <div className="mt-5 inline-flex items-center gap-2 rounded-2xl border border-amber-100 bg-amber-50 px-5 py-3">
+              <span className="text-sm font-extrabold text-amber-700">
+                🎁 Votre premier dossier est offert à la création du compte.
+                Ensuite, achetez des crédits uniquement si vous souhaitez créer
+                d&apos;autres dossiers.
+              </span>
+            </div>
+          </div>
+
+          <div className="grid items-start gap-6 md:grid-cols-3">
+            <div className="rounded-3xl border border-[#E2E8F0] bg-white p-7 shadow-[0_4px_24px_rgba(15,23,42,0.05)]">
+              <div className="mb-1 text-sm font-extrabold">Découverte</div>
+              <div className="mb-5 inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-xs font-extrabold text-amber-600 ring-1 ring-amber-100">
+                🎁 Offert à l&apos;inscription
+              </div>
+              <div className="mb-1 text-5xl font-extrabold tracking-tight">0€</div>
+              <div className="mb-1 text-sm font-semibold text-slate-400">
+                Sans carte bancaire
+              </div>
+              <div className="mb-6 text-xs font-semibold text-indigo-500">
+                → Pour tester sans risque
+              </div>
+              <div className="mb-0.5 text-2xl font-extrabold">1 dossier</div>
+              <div className="mb-6 text-sm font-semibold text-slate-400">
+                inclus à la création de compte
+              </div>
+              <div className="mb-6 h-px bg-[#E2E8F0]" />
+              <ul className="mb-8 space-y-3 text-sm font-semibold text-slate-600">
+                {[
+                  "Espace client partageable",
+                  "Barre de progression",
+                  "Lien unique sécurisé",
+                  "Récap lundi matin",
+                ].map((item) => (
+                  <li key={item} className="flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-indigo-600" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
               <a
-                href="/login"
-                className="mt-8 inline-flex w-full items-center justify-center rounded-2xl border border-[#E2E8F0] bg-white px-6 py-4 text-sm font-extrabold text-slate-800 hover:bg-slate-50 transition"
+                href="/signup"
+                className="inline-flex w-full items-center justify-center rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] px-6 py-4 text-sm font-extrabold text-slate-800 transition hover:bg-slate-100"
               >
-                Tester maintenant
+                Créer mon compte →
               </a>
             </div>
 
-            <div className="rounded-3xl border border-indigo-200 bg-indigo-50/60 p-7 shadow-[0_28px_90px_rgba(15,23,42,0.10)]">
-              <div className="rounded-3xl bg-white p-7 border border-[#E2E8F0]">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="text-2xl font-extrabold tracking-tight">
-                      Pack Lancement
-                    </div>
-                    <div className="mt-2 text-sm font-semibold text-slate-500">
-                      10 dossiers — recommandé
-                    </div>
-                  </div>
-                  <div className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-extrabold text-indigo-700 ring-1 ring-indigo-100">
-                    Économisez 100€
-                  </div>
-                </div>
-
-                <div className="mt-7 flex items-end gap-3">
-                  <div className="text-5xl font-extrabold tracking-tight">290€</div>
-                  <div className="pb-2 text-sm font-extrabold text-slate-600">HT</div>
-                  <div className="pb-2 text-sm font-extrabold text-slate-400 line-through">
-                    390€
-                  </div>
-                </div>
-
-                <div className="mt-6 rounded-2xl border border-indigo-200 bg-indigo-50 px-5 py-4">
-                  <div className="text-sm font-extrabold text-slate-900">
-                    Offre limitée — Pack “valeur”
-                  </div>
-                  <p className="mt-2 text-sm font-semibold text-slate-600 leading-relaxed">
-                    Moins de relances + une image plus pro = du temps gagné.
-                  </p>
-                </div>
-
-                <div className="mt-7 space-y-3 text-sm font-semibold text-slate-700">
-                  {[
-                    "10 Espaces Clients Premium",
-                    "Mises à jour illimitées",
-                    "Stockage de documents sécurisé",
-                    "Support prioritaire",
-                  ].map((x) => (
-                    <div key={x} className="flex items-center gap-3">
-                      <span className="mt-0.5 size-2 rounded-full bg-indigo-600" />
-                      {x}
-                    </div>
-                  ))}
-                </div>
-
-                <a
-                  href="/login"
-                  className="mt-8 inline-flex w-full items-center justify-center rounded-2xl px-6 py-4 text-sm font-extrabold text-white
-                             bg-[linear-gradient(135deg,#4F46E5_0%,#6366F1_60%,#7C3AED_100%)]
-                             shadow-[0_12px_28px_rgba(79,70,229,0.22)]
-                             transition-all duration-200 ease-out
-                             hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(79,70,229,0.28)]"
-                >
-                  Réserver mes crédits
-                </a>
-
-                <p className="mt-4 text-xs font-semibold text-slate-500">
-                  Vous serez redirigé vers votre espace pour finaliser l’achat.
-                </p>
+            <div className="relative rounded-3xl border border-indigo-200 bg-indigo-50/60 p-1 shadow-[0_28px_80px_rgba(79,70,229,0.14)]">
+              <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-indigo-600 px-5 py-1.5 text-[11px] font-extrabold uppercase tracking-wider text-white shadow-md">
+                ⚡ Populaire
               </div>
+              <div className="rounded-[20px] border border-[#E2E8F0] bg-white p-7">
+                <div className="mb-1 text-sm font-extrabold">Pro</div>
+                <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-xs font-extrabold text-amber-600 ring-1 ring-amber-100">
+                  🏷 Économisez 31%
+                </div>
+                <div className="mb-1 flex items-end gap-1.5">
+                  <div className="text-5xl font-extrabold tracking-tight">69€</div>
+                  <div className="pb-2 text-sm font-extrabold text-slate-500">
+                    HT
+                  </div>
+                </div>
+                <div className="mb-6 text-xs font-semibold text-indigo-500">
+                  → 13,80€ par dossier
+                </div>
+                <div className="mb-0.5 text-2xl font-extrabold">5 dossiers</div>
+                <div className="mb-6 text-sm font-semibold text-slate-400">
+                  Crédits sans expiration
+                </div>
+                <div className="mb-6 h-px bg-[#E2E8F0]" />
+                <ul className="mb-8 space-y-3 text-sm font-semibold text-slate-600">
+                  {[
+                    "Tout du pack Découverte",
+                    "Mises à jour illimitées",
+                    "Documents reçus par mail sécurisé",
+                    "Support par email",
+                  ].map((item) => (
+                    <li key={item} className="flex items-center gap-2">
+                      <span className="size-2 rounded-full bg-indigo-600" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+                <a
+                  href="/signup"
+                  className="inline-flex w-full items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#4F46E5_0%,#6366F1_60%,#7C3AED_100%)] px-6 py-4 text-sm font-extrabold text-white shadow-[0_12px_28px_rgba(79,70,229,0.22)] transition-all hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(79,70,229,0.28)]"
+                >
+                  Réserver mes crédits →
+                </a>
+              </div>
+            </div>
+
+            <div className="rounded-3xl border border-[#E2E8F0] bg-white p-7 shadow-[0_4px_24px_rgba(15,23,42,0.05)]">
+              <div className="mb-1 text-sm font-extrabold">Business</div>
+              <div className="mb-5 inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-xs font-extrabold text-amber-600 ring-1 ring-amber-100">
+                🏷 Économisez 48%
+              </div>
+              <div className="mb-1 flex items-end gap-1.5">
+                <div className="text-5xl font-extrabold tracking-tight">149€</div>
+                <div className="pb-2 text-sm font-extrabold text-slate-500">
+                  HT
+                </div>
+              </div>
+              <div className="mb-6 text-xs font-semibold text-indigo-500">
+                → 9,93€ par dossier
+              </div>
+              <div className="mb-0.5 text-2xl font-extrabold">15 dossiers</div>
+              <div className="mb-6 text-sm font-semibold text-slate-400">
+                Crédits sans expiration
+              </div>
+              <div className="mb-6 h-px bg-[#E2E8F0]" />
+              <ul className="mb-8 space-y-3 text-sm font-semibold text-slate-600">
+                {[
+                  "Tout du pack Pro",
+                  "Utilisable par plusieurs collaborateurs",
+                  "Support prioritaire par email",
+                ].map((item) => (
+                  <li key={item} className="flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-indigo-600" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <a
+                href="/signup"
+                className="inline-flex w-full items-center justify-center rounded-2xl border border-indigo-200 px-6 py-4 text-sm font-extrabold text-indigo-600 transition hover:bg-indigo-50"
+              >
+                Réserver mes crédits →
+              </a>
+            </div>
+          </div>
+
+          <div className="mt-10 flex flex-wrap justify-center gap-x-8 gap-y-3">
+            {[
+              "🔒 Paiement sécurisé",
+              "♾️ Crédits sans expiration",
+              "👤 Aucun compte client requis",
+              "⚡ Actif en 10 secondes",
+              "🚫 Zéro abonnement",
+            ].map((item) => (
+              <span key={item} className="text-sm font-semibold text-slate-400">
+                {item}
+              </span>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section id="faq" className="bg-white px-6 py-24">
+        <div className="mx-auto grid max-w-6xl items-start gap-16 md:grid-cols-[1fr_0.85fr]">
+          <div>
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-4 py-1.5">
+              <span className="text-xs font-extrabold uppercase tracking-wider text-indigo-600">
+                FAQ
+              </span>
+            </div>
+            <h2 className="mb-10 text-3xl font-extrabold tracking-tight sm:text-4xl">
+              Les questions
+              <br />
+              qu&apos;on nous <span className="text-indigo-600">pose</span>.
+            </h2>
+
+            <div className="space-y-3">
+              {[
+                {
+                  q: "Le client doit-il créer un compte ?",
+                  a: "Non. Votre client accède à son espace via un lien unique que vous lui envoyez. Aucune inscription, aucun mot de passe requis.",
+                },
+                {
+                  q: "Combien de temps pour créer un dossier ?",
+                  a: "Moins de 10 secondes. Vous entrez le nom du client et le nom du dossier — un lien unique est généré instantanément.",
+                },
+                {
+                  q: "Comment le client envoie ses documents ?",
+                  a: "Via un lien sécurisé intégré à son espace. Les documents vous sont transmis directement par email. Pas de stockage dans l'interface pro.",
+                },
+                {
+                  q: "Les crédits ont-ils une date d'expiration ?",
+                  a: "Non. Vos crédits sont permanents. Vous les utilisez à votre rythme, sans aucune pression.",
+                },
+                {
+                  q: "Puis-je utiliser l'outil à plusieurs dans mon cabinet ?",
+                  a: "Oui, si vous le souhaitez, plusieurs collaborateurs peuvent utiliser les mêmes codes d’accès au sein de votre structure. Une gestion d’équipe plus avancée n’est pas incluse à ce stade.",
+                },
+                {
+                  q: "C'est quoi le mail du lundi matin ?",
+                  a: "Chaque lundi matin, vous recevez automatiquement un récapitulatif de tous vos dossiers en cours — pour ne rien oublier de mettre à jour en début de semaine.",
+                },
+                {
+                  q: "Et si je n'ai pas de client actif en ce moment ?",
+                  a: "Aucun problème — vous ne payez rien. Pas d'abonnement à vide. Vous dépensez uniquement quand vous avez un dossier actif.",
+                },
+                {
+                  q: "Les données sont-elles sécurisées ?",
+                  a: "Oui. Chaque dossier possède son propre lien unique et l’accès n’est pas indexé publiquement. Seules les personnes disposant du lien peuvent consulter le suivi.",
+                },
+                {
+                  q: "Le lien client est-il public ou protégé ?",
+                  a: "Chaque dossier possède une URL unique et aléatoire. Seules les personnes qui reçoivent ce lien peuvent y accéder. Il n'y a aucun annuaire, aucune liste publique.",
+                },
+              ].map((item, i) => (
+                <details
+                  key={i}
+                  className="group overflow-hidden rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC]"
+                >
+                  <summary className="flex cursor-pointer list-none items-center justify-between px-6 py-5 text-sm font-extrabold text-slate-800 transition hover:bg-slate-50">
+                    {item.q}
+                    <span className="ml-4 flex-shrink-0 text-slate-300 transition-transform group-open:rotate-180 group-open:text-indigo-500">
+                      ▼
+                    </span>
+                  </summary>
+                  <div className="border-t border-[#E2E8F0] px-6 pb-5 pt-4 text-sm font-semibold leading-relaxed text-slate-500">
+                    {item.a}
+                  </div>
+                </details>
+              ))}
+            </div>
+          </div>
+
+          <div className="sticky top-24 rounded-3xl border border-indigo-200 bg-indigo-50 p-8 shadow-[0_20px_60px_rgba(79,70,229,0.10)]">
+            <div className="mb-3 text-2xl font-extrabold tracking-tight">
+              1 dossier offert.
+              <br />
+              Aucune carte requise.
+            </div>
+            <p className="mb-7 text-sm font-semibold leading-relaxed text-slate-600">
+              Testez Progressive Pulse gratuitement sur un vrai dossier. Voyez
+              par vous-même en moins de 10 secondes.
+            </p>
+            <a
+              href="/signup"
+              className="mb-4 inline-flex w-full items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#4F46E5_0%,#6366F1_60%,#7C3AED_100%)] px-6 py-4 text-sm font-extrabold text-white shadow-[0_12px_28px_rgba(79,70,229,0.22)] transition-all hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(79,70,229,0.28)]"
+            >
+              🎁 Commencer gratuitement
+            </a>
+            <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
+              {["Sans CB", "Aucun abonnement", "10 secondes"].map((item) => (
+                <span key={item} className="text-xs font-semibold text-slate-500">
+                  ✓ {item}
+                </span>
+              ))}
             </div>
           </div>
         </div>
       </section>
 
       {/* FINAL CTA */}
-      <section className="px-6 py-28 bg-indigo-700 text-white">
-        <div className="mx-auto max-w-6xl text-center">
-          <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight">
-            Prêt à transformer votre relation client ?
+      <section className="bg-indigo-700 px-6 py-28 text-center text-white">
+        <div className="mx-auto max-w-3xl">
+          <h2 className="mb-6 text-4xl font-extrabold leading-tight tracking-tight md:text-5xl">
+            Simplifiez la gestion
+            <br />
+            de vos dossiers clients.
           </h2>
-          <p className="mx-auto mt-6 max-w-2xl text-lg font-semibold opacity-95 leading-relaxed">
-            Donne à tes clients une visibilité claire. Réduis les relances. Monte en gamme.
+          <p className="mx-auto mb-10 max-w-xl text-lg font-semibold leading-relaxed opacity-90">
+            Un lien. 10 secondes. Votre client est informé en temps réel.
+            Commencez avec 1 dossier offert — sans carte.
           </p>
-
-          <div className="mt-12 flex flex-col gap-3 sm:flex-row sm:justify-center">
+          <div className="mb-8 flex flex-col justify-center gap-3 sm:flex-row">
             <a
-              href="/login"
-              className="rounded-2xl bg-white px-8 py-4 text-sm font-extrabold text-indigo-700 hover:bg-slate-100 transition"
+              href="/signup"
+              className="rounded-2xl bg-white px-8 py-4 text-sm font-extrabold text-indigo-700 transition hover:bg-indigo-50"
             >
-              Commencer maintenant
+              🎁 Créer mon premier dossier
             </a>
             <a
-              href="/demo"
-              className="rounded-2xl border border-white/30 bg-white/10 px-8 py-4 text-sm font-extrabold text-white hover:bg-white/15 transition"
+              href="#demo"
+              className="rounded-2xl border border-white/30 bg-white/10 px-8 py-4 text-sm font-extrabold text-white transition hover:bg-white/20"
             >
-              Découvrir la démo
+              Voir la démo →
             </a>
           </div>
-
-          <div className="mt-10 text-xs font-extrabold uppercase tracking-widest opacity-90">
-            Progressive Pulse • Suivi client structuré
+          <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
+            {[
+              "1 dossier offert sans CB",
+              "Aucun abonnement",
+              "Actif en 10 secondes",
+            ].map((item) => (
+              <span key={item} className="text-xs font-semibold opacity-80">
+                ✓ {item}
+              </span>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Footer */}
+      {/* FOOTER */}
       <footer className="bg-[#F8FAFC] px-6 py-16">
-        <div className="mx-auto max-w-6xl grid gap-10 md:grid-cols-3">
+        <div className="mx-auto mb-12 grid max-w-6xl gap-10 md:grid-cols-3">
           <div>
-            <div className="text-sm font-extrabold">Progressive Pulse</div>
-            <p className="mt-4 text-sm font-semibold text-slate-600 leading-relaxed">
-              Le suivi de dossiers qui réduit les relances et renforce la confiance client.
+            <div className="mb-4 flex items-center gap-2">
+              <div className="flex size-8 items-center justify-center rounded-xl bg-indigo-600 text-sm font-extrabold text-white">
+                P
+              </div>
+              <span className="text-sm font-extrabold">Progressive Pulse</span>
+            </div>
+            <p className="text-sm font-semibold leading-relaxed text-slate-500">
+              Le suivi de dossiers simple et partageable, pour informer vos
+              clients sans perdre de temps.
             </p>
           </div>
 
           <div>
-            <div className="text-xs font-extrabold uppercase tracking-widest text-slate-400">
+            <div className="mb-4 text-xs font-extrabold uppercase tracking-widest text-slate-400">
               Produit
             </div>
-            <div className="mt-4 space-y-3">
-              <a className="block text-sm font-semibold text-slate-600 hover:text-slate-900" href="#benefices">
-                Bénéfices
-              </a>
-              <a className="block text-sm font-semibold text-slate-600 hover:text-slate-900" href="/demo">
-                Démo
-              </a>
-              <a className="block text-sm font-semibold text-slate-600 hover:text-slate-900" href="#tarifs">
-                Tarifs
-              </a>
+            <div className="space-y-3">
+              {[
+                ["Comment ça marche", "#how"],
+                ["Métiers", "#metiers"],
+                ["Démo", "#demo"],
+                ["Tarifs", "#tarifs"],
+              ].map(([label, href]) => (
+                <a
+                  key={label}
+                  href={href}
+                  className="block text-sm font-semibold text-slate-500 transition hover:text-slate-900"
+                >
+                  {label}
+                </a>
+              ))}
             </div>
           </div>
 
           <div>
-            <div className="text-xs font-extrabold uppercase tracking-widest text-slate-400">
+            <div className="mb-4 text-xs font-extrabold uppercase tracking-widest text-slate-400">
               Accès
             </div>
-            <div className="mt-4 space-y-3">
-              <a className="block text-sm font-semibold text-slate-600 hover:text-slate-900" href="/login">
-                Connexion
-              </a>
-              <a className="block text-sm font-semibold text-slate-600 hover:text-slate-900" href="/pro">
-                Dashboard
-              </a>
+            <div className="space-y-3">
+              {[
+                ["Connexion", "/login"],
+                ["Créer un compte", "/signup"],
+                ["FAQ", "#faq"],
+              ].map(([label, href]) => (
+                <a
+                  key={label}
+                  href={href}
+                  className="block text-sm font-semibold text-slate-500 transition hover:text-slate-900"
+                >
+                  {label}
+                </a>
+              ))}
             </div>
           </div>
         </div>
 
-        <div className="mx-auto mt-12 max-w-6xl border-t border-[#E2E8F0] pt-8 text-center text-xs font-semibold text-slate-400">
-          © {new Date().getFullYear()} Progressive Pulse
+        <div className="mx-auto max-w-6xl border-t border-[#E2E8F0] pt-8 text-center text-xs font-semibold text-slate-400">
+          © 2026 Progressive Pulse • Suivi client structuré
         </div>
       </footer>
     </main>
