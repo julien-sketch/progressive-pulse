@@ -23,11 +23,46 @@ function escapeHtml(s: string) {
     .replaceAll("'", "&#039;");
 }
 
+function normalizeType(t: string | null | undefined) {
+  const v = (t ?? "").toLowerCase().trim();
+
+  if (v === "immobilier") return "immo";
+  if (v === "formation") return "of";
+  if (v === "artisan" || v === "artisans") return "artisan";
+
+  if (
+    v === "freelance" ||
+    v === "freelancer" ||
+    v === "freelances" ||
+    v === "free-lance"
+  ) {
+    return "freelance";
+  }
+
+  if (v === "immo" || v === "of" || v === "courtier" || v === "artisan" || v === "freelance") {
+    return v;
+  }
+
+  return "other";
+}
+
+function getTypeLabel(projectType: string | null | undefined) {
+  const t = normalizeType(projectType);
+
+  if (t === "immo") return "Immobilier";
+  if (t === "of") return "Organisme de formation";
+  if (t === "courtier") return "Courtier";
+  if (t === "artisan") return "Artisan";
+  if (t === "freelance") return "Freelance";
+
+  return "Autre";
+}
+
 async function sendWithBackoff(
   resend: Resend,
   payload: { from: string; to: string; subject: string; html: string }
 ) {
-  const delays = [0, 1200, 2500]; // 3 tentatives max
+  const delays = [0, 1200, 2500];
   let lastErr: any = null;
 
   for (let i = 0; i < delays.length; i++) {
@@ -40,7 +75,7 @@ async function sendWithBackoff(
       lastErr = e;
       const status = e?.statusCode || e?.status || null;
       const name = e?.name || "";
-      // On réessaie uniquement si rate limit
+
       if (!(status === 429 || name === "rate_limit_exceeded")) break;
     }
   }
@@ -54,12 +89,13 @@ async function sendWithBackoff(
 
 export async function GET() {
   const RESEND_API_KEY = env("RESEND_API_KEY");
-  const EMAIL_FROM = env("EMAIL_FROM"); // ex: Pro-Pulse <support@picqtures.fr>
+  const EMAIL_FROM = env("EMAIL_FROM");
   const BASE_URL = env("BASE_URL") || "https://progressive-pulse-snowy.vercel.app";
 
   if (!RESEND_API_KEY) {
     return NextResponse.json({ error: "Missing RESEND_API_KEY" }, { status: 500 });
   }
+
   if (!EMAIL_FROM) {
     return NextResponse.json({ error: "Missing EMAIL_FROM" }, { status: 500 });
   }
@@ -67,7 +103,6 @@ export async function GET() {
   const supabase = getSupabaseAdmin();
   const resend = new Resend(RESEND_API_KEY);
 
-  // 1) Récupérer tous les projets
   const { data: projects, error } = await supabase
     .from("projects")
     .select("id, client_name, broker_email, access_token, project_type")
@@ -77,23 +112,20 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  // 2) Grouper par broker_email
   const byBroker = new Map<string, typeof projects>();
 
   for (const p of projects ?? []) {
     const email = String(p.broker_email || "").trim().toLowerCase();
     if (!email) continue;
+
     if (!byBroker.has(email)) byBroker.set(email, []);
     byBroker.get(email)!.push(p);
   }
 
   const results: Array<{ to: string; ok: boolean; attempts?: number; error?: string }> = [];
-
-  // Throttle entre emails (maintenant tu en envoies très peu)
   const THROTTLE_MS = 600;
 
   for (const [to, list] of byBroker.entries()) {
-    // 3) Construire le HTML de tous les dossiers de ce broker
     let blocks = "";
 
     for (const p of list) {
@@ -106,7 +138,7 @@ export async function GET() {
         .eq("project_id", p.id)
         .order("order_index", { ascending: true });
 
-      const typeLabel = p.project_type === "of" ? "Organisme de formation" : "Immobilier";
+      const typeLabel = getTypeLabel(p.project_type);
       const clientName = String(p.client_name || "").trim() || "Client";
 
       if (stepsError || !steps?.length) {

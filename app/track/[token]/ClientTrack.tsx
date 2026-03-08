@@ -60,12 +60,21 @@ const STATUS_BY_TYPE: Record<string, StatusDef[]> = {
   artisan: [
     { label: "Devis envoyé", percent: 0  },
     { label: "Devis accepté", percent: 15 },
-    { label: "Commande materiel", percent: 30 },
-    { label: "travaux en cours", percent: 45 },
+    { label: "Commande matériel", percent: 30 },
+    { label: "Travaux en cours", percent: 45 },
     { label: "Travaux terminés", percent: 65 },
     { label: "Visite fin de travaux", percent: 80 },
     { label: "Facture envoyée", percent: 90 },
     { label: "Terminé", percent: 100 },
+  ],
+   freelance: [
+    { label: "Devis envoyé", percent: 0 },
+    { label: "Devis accepté", percent: 15 },
+    { label: "Travail en cours", percent: 30 },
+    { label: "Première version livrée", percent: 50 },
+    { label: "Ajustements en cours", percent: 65 },
+    { label: "Facture envoyée", percent: 90 },
+    { label: "Projet terminé", percent: 100 },
   ],
   other: [
     { label: "Documents reçus", percent: 0 },
@@ -78,7 +87,6 @@ function clampPct(n: number | null | undefined) {
   const v = typeof n === "number" ? n : 0;
   return Math.max(0, Math.min(100, Math.round(v)));
 }
-
 function normalizeType(t: string | null | undefined) {
   const v = (t ?? "").toLowerCase().trim();
 
@@ -86,11 +94,21 @@ function normalizeType(t: string | null | undefined) {
   if (v === "formation") return "of";
   if (v === "artisan" || v === "artisans") return "artisan";
 
-  if (v === "immo" || v === "of" || v === "artisan") return v;
+  if (
+    v === "freelance" ||
+    v === "freelancer" ||
+    v === "freelances" ||
+    v === "free-lance"
+  ) {
+    return "freelance";
+  }
+
+  if (v === "immo" || v === "of" || v === "courtier" || v === "artisan" || v === "freelance") {
+    return v;
+  }
 
   return "other";
 }
-
 function normalizePhone(phone: string) {
   return phone.replace(/[^\d+]/g, "");
 }

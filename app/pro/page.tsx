@@ -72,10 +72,13 @@ const STEPS_BY_TYPE: Record<string, StepDef[]> = {
     { label: "Terminé" },
   ],
   freelance: [
-    { label: "Demande reçue" },
-    { label: "Devis validé" },
-    { label: "En cours" },
-    { label: "Livré" },
+    { label: "Devis envoyé" },
+    { label: "Devis accepté" },
+    { label: "Travail en cours" },
+    { label: "Première version livrée" },
+    { label: "Ajustements en cours" },
+    { label: "Facture envoyée" },
+    { label: "Projet terminé" },
   ],
   other: [
     { label: "Documents reçus" },
@@ -100,10 +103,24 @@ function clampPct(n: number | null | undefined) {
 
 function normalizeType(t: string | null | undefined) {
   const v = (t ?? "").toLowerCase().trim();
+
   if (v === "immobilier") return "immo";
   if (v === "formation") return "of";
-  if (v === "immo" || v === "of") return v;
-  if (v === "courtier" || v === "artisan" || v === "freelance") return v;
+  if (v === "artisan" || v === "artisans") return "artisan";
+
+  if (
+    v === "freelance" ||
+    v === "freelancer" ||
+    v === "freelances" ||
+    v === "free-lance"
+  ) {
+    return "freelance";
+  }
+
+  if (v === "immo" || v === "of" || v === "courtier" || v === "artisan" || v === "freelance") {
+    return v;
+  }
+
   return "other";
 }
 
