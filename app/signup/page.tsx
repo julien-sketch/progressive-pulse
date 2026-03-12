@@ -31,6 +31,7 @@ export default function SignupPage() {
   const [profession, setProfession] = useState<ProfessionValue>("courtier");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [acceptLegal, setAcceptLegal] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -66,6 +67,11 @@ export default function SignupPage() {
       return;
     }
 
+    if (!acceptLegal) {
+      setErrorMsg("Tu dois accepter les CGU et les CGV pour créer un compte.");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -73,6 +79,8 @@ export default function SignupPage() {
         typeof window !== "undefined"
           ? `${window.location.origin}/login`
           : undefined;
+
+      const acceptedAt = new Date().toISOString();
 
       const { data, error } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
@@ -84,6 +92,9 @@ export default function SignupPage() {
             last_name: lastName.trim(),
             phone: phone.trim(),
             profession,
+            accepted_cgu: true,
+            accepted_cgv: true,
+            accepted_legal_at: acceptedAt,
           },
         },
       });
@@ -270,6 +281,35 @@ export default function SignupPage() {
                     className="w-full rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] px-4 py-3.5 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                   />
                 </div>
+              </div>
+
+              <div className="rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] px-4 py-3.5">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={acceptLegal}
+                    onChange={(e) => setAcceptLegal(e.target.checked)}
+                    className="mt-1 size-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="text-sm font-semibold text-slate-600 leading-6">
+                    J’accepte les{" "}
+                    <Link href="/cgu" className="font-extrabold text-indigo-600 hover:text-indigo-700 underline">
+                      CGU
+                    </Link>{" "}
+                    et les{" "}
+                    <Link href="/cgv" className="font-extrabold text-indigo-600 hover:text-indigo-700 underline">
+                      CGV
+                    </Link>
+                    . J’ai également pris connaissance de la{" "}
+                    <Link
+                      href="/confidentialite"
+                      className="font-extrabold text-indigo-600 hover:text-indigo-700 underline"
+                    >
+                      politique de confidentialité
+                    </Link>
+                    .
+                  </span>
+                </label>
               </div>
 
               {errorMsg ? (

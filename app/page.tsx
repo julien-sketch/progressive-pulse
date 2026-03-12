@@ -1309,69 +1309,91 @@ export default function HomePage() {
       </section>
 
       {/* FOOTER */}
-      <footer className="bg-[#F8FAFC] px-6 py-16">
-        <div className="mx-auto mb-12 grid max-w-6xl gap-10 md:grid-cols-3">
-          <div>
-            <div className="mb-4 flex items-center gap-2">
-              <div className="flex size-8 items-center justify-center rounded-xl bg-indigo-600 text-sm font-extrabold text-white">
-                P
-              </div>
-              <span className="text-sm font-extrabold">Progressive Pulse</span>
-            </div>
-            <p className="text-sm font-semibold leading-relaxed text-slate-500">
-              Le suivi de dossiers simple et partageable, pour informer vos
-              clients sans perdre de temps.
-            </p>
-          </div>
-
-          <div>
-            <div className="mb-4 text-xs font-extrabold uppercase tracking-widest text-slate-400">
-              Produit
-            </div>
-            <div className="space-y-3">
-              {[
-                ["Comment ça marche", "#how"],
-                ["Métiers", "#metiers"],
-                ["Démo", "#demo"],
-                ["Tarifs", "#tarifs"],
-              ].map(([label, href]) => (
-                <a
-                  key={label}
-                  href={href}
-                  className="block text-sm font-semibold text-slate-500 transition hover:text-slate-900"
-                >
-                  {label}
-                </a>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <div className="mb-4 text-xs font-extrabold uppercase tracking-widest text-slate-400">
-              Accès
-            </div>
-            <div className="space-y-3">
-              {[
-                ["Connexion", "/login"],
-                ["Créer un compte", "/signup"],
-                ["FAQ", "#faq"],
-              ].map(([label, href]) => (
-                <a
-                  key={label}
-                  href={href}
-                  className="block text-sm font-semibold text-slate-500 transition hover:text-slate-900"
-                >
-                  {label}
-                </a>
-              ))}
-            </div>
-          </div>
+<footer className="bg-[#F8FAFC] px-6 py-16">
+  <div className="mx-auto mb-12 grid max-w-6xl gap-10 md:grid-cols-4">
+    <div>
+      <div className="mb-4 flex items-center gap-2">
+        <div className="flex size-8 items-center justify-center rounded-xl bg-indigo-600 text-sm font-extrabold text-white">
+          P
         </div>
+        <span className="text-sm font-extrabold">Progressive Pulse</span>
+      </div>
+      <p className="text-sm font-semibold leading-relaxed text-slate-500">
+        Le suivi de dossiers simple et partageable, pour informer vos
+        clients sans perdre de temps.
+      </p>
+    </div>
 
-        <div className="mx-auto max-w-6xl border-t border-[#E2E8F0] pt-8 text-center text-xs font-semibold text-slate-400">
-          © 2026 Progressive Pulse • Suivi client structuré
-        </div>
-      </footer>
+    <div>
+      <div className="mb-4 text-xs font-extrabold uppercase tracking-widest text-slate-400">
+        Produit
+      </div>
+      <div className="space-y-3">
+        {[
+          ["Comment ça marche", "#how"],
+          ["Métiers", "#metiers"],
+          ["Démo", "#demo"],
+          ["Tarifs", "#tarifs"],
+        ].map(([label, href]) => (
+          <a
+            key={label}
+            href={href}
+            className="block text-sm font-semibold text-slate-500 transition hover:text-slate-900"
+          >
+            {label}
+          </a>
+        ))}
+      </div>
+    </div>
+
+    <div>
+      <div className="mb-4 text-xs font-extrabold uppercase tracking-widest text-slate-400">
+        Accès
+      </div>
+      <div className="space-y-3">
+        {[
+          ["Connexion", "/login"],
+          ["Créer un compte", "/signup"],
+          ["FAQ", "#faq"],
+        ].map(([label, href]) => (
+          <a
+            key={label}
+            href={href}
+            className="block text-sm font-semibold text-slate-500 transition hover:text-slate-900"
+          >
+            {label}
+          </a>
+        ))}
+      </div>
+    </div>
+
+    <div>
+      <div className="mb-4 text-xs font-extrabold uppercase tracking-widest text-slate-400">
+        Légal
+      </div>
+      <div className="space-y-3">
+        {[
+          ["Mentions légales", "/mentions-legales"],
+          ["CGU", "/cgu"],
+          ["CGV", "/cgv"],
+          ["Confidentialité", "/confidentialite"],
+        ].map(([label, href]) => (
+          <a
+            key={label}
+            href={href}
+            className="block text-sm font-semibold text-slate-500 transition hover:text-slate-900"
+          >
+            {label}
+          </a>
+        ))}
+      </div>
+    </div>
+  </div>
+
+  <div className="mx-auto max-w-6xl border-t border-[#E2E8F0] pt-8 text-center text-xs font-semibold text-slate-400">
+    © 2026 Progressive Pulse • Suivi client structuré
+  </div>
+</footer>
     </main>
   );
 }
