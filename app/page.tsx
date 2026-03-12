@@ -1368,26 +1368,27 @@ export default function HomePage() {
     </div>
 
     <div>
-      <div className="mb-4 text-xs font-extrabold uppercase tracking-widest text-slate-400">
-        Légal
-      </div>
-      <div className="space-y-3">
-        {[
-          ["Mentions légales", "/mentions-legales"],
-          ["CGU", "/cgu"],
-          ["CGV", "/cgv"],
-          ["Confidentialité", "/confidentialite"],
-        ].map(([label, href]) => (
-          <a
-            key={label}
-            href={href}
-            className="block text-sm font-semibold text-slate-500 transition hover:text-slate-900"
-          >
-            {label}
-          </a>
-        ))}
-      </div>
-    </div>
+  <div className="mb-4 text-xs font-extrabold uppercase tracking-widest text-slate-400">
+    Légal
+  </div>
+  <div className="space-y-3">
+    {[
+      ["Mentions légales", "/mentions-legales"],
+      ["CGU", "/cgu"],
+      ["CGV", "/cgv"],
+      ["Confidentialité", "/confidentialite"],
+      ["Cookies", "/cookies"],
+    ].map(([label, href]) => (
+      <a
+        key={label}
+        href={href}
+        className="block text-sm font-semibold text-slate-500 transition hover:text-slate-900"
+      >
+        {label}
+      </a>
+    ))}
+  </div>
+</div>
   </div>
 
   <div className="mx-auto max-w-6xl border-t border-[#E2E8F0] pt-8 text-center text-xs font-semibold text-slate-400">
