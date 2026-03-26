@@ -8,7 +8,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-primary-sans);
   --font-mono: var(--font-geist-mono);
 }
 
@@ -22,5 +22,56 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Lighten display typography without flattening smaller UI labels and buttons. */
+:where(.text-4xl, .text-5xl, .text-6xl, .text-\[64px\]) {
+  font-weight: 700;
+}
+
+:where(.text-2xl, .text-3xl, .sm\:text-4xl, .md\:text-5xl) {
+  font-weight: 650;
+}
+
+.landing-page {
+  --landing-border: rgba(148, 163, 184, 0.22);
+  --landing-shadow: 0 18px 40px rgba(15, 23, 42, 0.04);
+}
+
+.landing-page .landing-section {
+  padding-top: clamp(6rem, 9vw, 8rem);
+  padding-bottom: clamp(6rem, 9vw, 8rem);
+}
+
+.landing-page .landing-hero {
+  padding-top: clamp(4rem, 8vw, 6rem);
+  padding-bottom: clamp(5rem, 9vw, 7rem);
+}
+
+.landing-page h2,
+.landing-page h3 {
+  letter-spacing: -0.025em;
+}
+
+.landing-page h2 {
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+.landing-page h3 {
+  font-weight: 600;
+}
+
+.landing-page :is(p, li, td, summary) {
+  line-height: 1.75;
+}
+
+.landing-page :is(.rounded-2xl, .rounded-3xl, .rounded-\[20px\], .rounded-\[24px\], .rounded-\[28px\], .rounded-\[32px\]) {
+  border-color: var(--landing-border);
+}
+
+.landing-page :is(.shadow-sm, .shadow-md),
+.landing-page [class*="shadow-["] {
+  box-shadow: var(--landing-shadow);
 }
