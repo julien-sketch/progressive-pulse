@@ -1,34 +1,48 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-function unauthorized() {
-  return new NextResponse("Unauthorized", {
-    status: 401,
-    headers: { "WWW-Authenticate": 'Basic realm="Admin"' },
-  });
-}
+export function middleware(request: NextRequest) {
+  const host = request.headers.get("host") || "";
+  const { pathname } = request.nextUrl;
 
-export function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
+  // On laisse passer les assets, API, fichiers système
+  if (
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/api") ||
+    pathname.includes(".")
+  ) {
+    return NextResponse.next();
+  }
 
-  // ✅ protège uniquement /admin et /api/admin
-  const isAdminRoute = pathname.startsWith("/admin") || pathname.startsWith("/api/admin");
-  if (!isAdminRoute) return NextResponse.next();
+  // Sous-domaine agents immobiliers
+  if (host === "agents-immobiliers.progressive-pulse.fr") {
+    if (pathname === "/") {
+      return NextResponse.rewrite(
+        new URL("/agents-immobiliers", request.url)
+      );
+    }
+  }
 
-  const user = process.env.ADMIN_USER;
-  const pass = process.env.ADMIN_PASS;
-  if (!user || !pass) return unauthorized();
+  // Sous-domaine organismes de formation
+  if (host === "organismes-formations.progressive-pulse.fr") {
+    if (pathname === "/") {
+      return NextResponse.rewrite(
+        new URL("/organismes-de-formation", request.url)
+      );
+    }
+  }
 
-  const auth = req.headers.get("authorization");
-  if (!auth?.startsWith("Basic ")) return unauthorized();
-
-  const decoded = Buffer.from(auth.slice(6), "base64").toString();
-  const [u, p] = decoded.split(":");
-  if (u !== user || p !== pass) return unauthorized();
+  // Domaine principal = page mère
+  if (
+    host === "progressive-pulse.fr" ||
+    host === "www.progressive-pulse.fr"
+  ) {
+    return NextResponse.next();
+  }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/api/admin/:path*"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
