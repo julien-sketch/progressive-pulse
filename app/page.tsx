@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 export default function HomePage() {
   return (
     <main className="min-h-screen bg-white text-slate-900">
@@ -124,7 +126,25 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="rounded-[32px] border border-slate-200 bg-white p-5">
+            <div className="relative">
+              <div
+                aria-hidden
+                className="absolute inset-x-12 top-10 h-24 rounded-full bg-[radial-gradient(circle,rgba(99,102,241,0.18),transparent_70%)] blur-3xl"
+              />
+              <div className="relative overflow-hidden rounded-[36px] border border-slate-200/80 bg-white/80 p-4 shadow-[0_28px_80px_rgba(15,23,42,0.12)] backdrop-blur-sm">
+                <div className="rounded-[28px] bg-[linear-gradient(180deg,#f8fafc_0%,#eef2ff_100%)] p-3">
+                  <Image
+                    src="/images/mockup-demo3.png"
+                    alt="Mockup de l'application Progressive Pulse sur mobile"
+                    width={1200}
+                    height={1600}
+                    priority
+                    className="h-auto w-full rounded-[24px] object-cover"
+                  />
+                </div>
+              </div>
+
+              <div className="hidden rounded-[32px] border border-slate-200 bg-white p-5">
               <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-6">
                 <div className="mb-5 flex items-center justify-between">
                   <div>
@@ -216,6 +236,7 @@ export default function HomePage() {
                   Clair pour le client. Léger pour vous.
                 </p>
               </div>
+            </div>
             </div>
           </div>
         </div>
