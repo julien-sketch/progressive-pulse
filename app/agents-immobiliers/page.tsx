@@ -21,13 +21,16 @@ function InteractiveDemo() {
   const [progress, setProgress] = useState(0);
 
   const dossierSteps = [
-    "Mandat signé",
-    "Shooting photo réalisé",
-    "Annonce publiée",
-    "Visites en cours",
-    "Offre reçue",
-    "Compromis signé",
-    "Acte authentique signé",
+  "Mandat de vente signé",
+  "Shooting photo réalisé",
+  "Annonce publiée",
+  "Visites en cours",
+  "Offre d'achat acceptée",
+  "Compromis de vente signé",
+  "Délai de rétractation purgé", // 10 jours après le compromis
+  "Dossier de financement / Prêt accordé", // Le gros tunnel de 2 mois
+  "État des lieux avant signature", // Le jour J, juste avant le notaire
+  "Acte authentique signé",
   ];
 
   const handleGenerate = () => {
@@ -392,8 +395,8 @@ const faqs = [
     a: "En quelques secondes. Vous renseignez le nom du client, le bien ou le dossier, puis le lien est prêt à être envoyé.",
   },
   {
-    q: "Quelles étapes puis-je afficher ?",
-    a: "Par exemple : mandat signé, shooting photo, annonce publiée, visites en cours, offre reçue, compromis signé, acte authentique signé.",
+    q: "Quelles étapes sont affichées ?",
+    a: "Les étapes sont prédéfinies pour correspondre au déroulé classique d’une vente immobilière : mandat, shooting photo, annonce, visites, offre acceptée, compromis, délai de rétractation, financement, état des lieux avant signature et acte authentique.",
   },
   {
     q: "Pourquoi ne pas simplement envoyer des SMS au client ?",
@@ -601,8 +604,13 @@ export default function AgentsImmobiliersPage() {
                       ["Mandat signé", true, false],
                       ["Shooting photo réalisé", true, false],
                       ["Annonce publiée", true, false],
-                      ["Visites en cours", false, true],
-                      ["Offre reçue", false, false],
+                      ["Visites en cours", false, true], // Étape en cours actuelle
+                      ["Offre acceptée", false, false],
+                      ["Compromis signé", false, false],
+                      ["Délai de rétractation purgé", false, false],
+                      ["Financement / Prêt accordé", false, false],
+                      ["État des lieux avant signature", false, false],
+                      ["Acte authentique signé", false, false],
                     ] as Array<[string, boolean, boolean]>).map(
                       ([label, done, current]) => (
                         <div
@@ -970,19 +978,19 @@ export default function AgentsImmobiliersPage() {
                   {
                     m: "Mandat simple",
                     g: "3 000€ – 8 000€",
-                    c: "19€",
+                    c: "39€",
                     r: "Très faible",
                   },
                   {
                     m: "Mandat exclusif",
                     g: "5 000€ – 15 000€",
-                    c: "19€",
+                    c: "39€",
                     r: "Quasi négligeable",
                   },
                   {
                     m: "Portefeuille récurrent",
                     g: "Variable",
-                    c: "69€ / 5 dossiers",
+                    c: "149€ / 5 dossiers",
                     r: "Très rentable",
                   },
                 ].map((row, i) => (
@@ -1011,7 +1019,7 @@ export default function AgentsImmobiliersPage() {
           </div>
 
           <p className="mt-8 text-center font-semibold italic text-slate-500">
-            “À 19€, ce n’est pas une dépense.
+            “À 39€, ce n’est pas une dépense.
             <span className="font-extrabold not-italic text-slate-900">
               {" "}
               C’est un amortisseur de friction.
@@ -1090,21 +1098,21 @@ export default function AgentsImmobiliersPage() {
               </div>
               <div className="rounded-[20px] border border-slate-200 bg-white p-7">
                 <div className="mb-1 text-sm font-extrabold text-slate-900">
-                  Pro
+                  Pack Agence
                 </div>
                 <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-extrabold text-emerald-600 ring-1 ring-emerald-100">
-                  Économisez 31%
+                  29,80€ par dossier
                 </div>
                 <div className="mb-1 flex items-end gap-1.5">
                   <div className="text-5xl font-extrabold tracking-tight text-slate-900">
-                    69€
+                    149€
                   </div>
                   <div className="pb-2 text-sm font-extrabold text-slate-500">
                     HT
                   </div>
                 </div>
                 <div className="mb-6 text-xs font-semibold text-slate-500">
-                  13,80€ par dossier
+                  29,80€ par dossier
                 </div>
                 <div className="mb-0.5 text-2xl font-extrabold text-slate-900">
                   5 dossiers
@@ -1127,34 +1135,34 @@ export default function AgentsImmobiliersPage() {
                   ))}
                 </ul>
                 <a
-                  href="/signup"
+                  href="/checkout?plan=pack5"
                   className="inline-flex w-full items-center justify-center rounded-2xl bg-slate-900 px-6 py-4 text-sm font-extrabold text-white shadow-[0_12px_28px_rgba(15,23,42,0.18)] transition-all hover:-translate-y-0.5"
                 >
-                  Réserver mes crédits →
+                  Acheter ce pack →
                 </a>
               </div>
             </div>
 
             <div className="rounded-3xl border border-slate-200 bg-white p-7 shadow-[0_4px_24px_rgba(15,23,42,0.05)]">
               <div className="mb-1 text-sm font-extrabold text-slate-900">
-                Business
+                Standard
               </div>
               <div className="mb-5 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-extrabold text-emerald-600 ring-1 ring-emerald-100">
-                Économisez 48%
+                1 dossier immobilier complet
               </div>
               <div className="mb-1 flex items-end gap-1.5">
                 <div className="text-5xl font-extrabold tracking-tight text-slate-900">
-                  149€
+                  39€
                 </div>
                 <div className="pb-2 text-sm font-extrabold text-slate-500">
                   HT
                 </div>
               </div>
               <div className="mb-6 text-xs font-semibold text-slate-500">
-                9,93€ par dossier
+                1 dossier complet
               </div>
               <div className="mb-0.5 text-2xl font-extrabold text-slate-900">
-                15 dossiers
+                1 dossier
               </div>
               <div className="mb-6 text-sm font-semibold text-slate-400">
                 Crédits sans expiration
@@ -1162,9 +1170,9 @@ export default function AgentsImmobiliersPage() {
               <div className="mb-6 h-px bg-slate-200" />
               <ul className="mb-8 space-y-3 text-sm font-semibold text-slate-600">
                 {[
-                  "Tout du pack Pro",
-                  "Volume plus rentable",
-                  "Utilisation souple",
+                  "Tout du pack Découverte",
+                  "Mises à jour illimitées",
+                  "Paiement à l’usage",
                 ].map((item) => (
                   <li key={item} className="flex items-center gap-2">
                     <span className="size-2 rounded-full bg-slate-900" />
@@ -1173,10 +1181,10 @@ export default function AgentsImmobiliersPage() {
                 ))}
               </ul>
               <a
-                href="/signup"
+                href="/checkout?plan=single"
                 className="inline-flex w-full items-center justify-center rounded-2xl border border-slate-200 px-6 py-4 text-sm font-extrabold text-slate-900 transition hover:bg-slate-50"
               >
-                Réserver mes crédits →
+                Créer 1 dossier →
               </a>
             </div>
           </div>

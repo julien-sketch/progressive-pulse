@@ -174,8 +174,8 @@ export default function CGUPage() {
               </p>
               <p className="mt-3">Les packs disponibles sont :</p>
               <ul className="ml-6 mt-3 list-disc space-y-1">
-                <li>Pack 5 dossiers : 69 € HT</li>
-                <li>Pack 15 dossiers : 149 € HT</li>
+                <li>1 dossier : 39 € HT</li>
+                <li>Pack 5 dossiers : 149 € HT</li>
               </ul>
               <p className="mt-3">
                 Chaque création de dossier consomme un crédit.

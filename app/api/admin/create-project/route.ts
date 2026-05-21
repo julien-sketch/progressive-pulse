@@ -7,6 +7,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { IMMO_STEPS } from "@/lib/templates/immo";
 import { OF_STEPS } from "@/lib/templates/of";
 
+
 type ProjectType = "immo" | "of";
 
 function slugify(input: string) {
@@ -65,7 +66,9 @@ export async function POST(req: Request) {
 
   // Valeurs par défaut selon type
   const defaultStatus =
-    safeType === "of" ? "Documents reçus" : "Mandat signé";
+  safeType === "immo"
+    ? IMMO_STEPS[0]
+    : OF_STEPS[0];
 
   const { data: inserted, error: insertError } = await supabase
     .from("projects")
@@ -90,14 +93,13 @@ export async function POST(req: Request) {
     );
   }
 
-  const templateSteps = safeType === "of" ? OF_STEPS : IMMO_STEPS;
-
-  const stepsRows = templateSteps.map((label, idx) => ({
-    project_id: inserted.id,
-    order_index: idx + 1,
-    label,
-    is_completed: false,
-  }));
+const templateSteps = IMMO_STEPS;
+const stepsRows = templateSteps.map((label, index) => ({
+  project_id: inserted.id,
+  order_index: index + 1,
+  label,
+  is_completed: index === 0,
+}));
 
   const { error: stepsError } = await supabase
     .from("project_steps")

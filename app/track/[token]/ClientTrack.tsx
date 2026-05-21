@@ -34,52 +34,21 @@ type Step = {
 };
 
 type StatusDef = { label: string; percent: number };
-
 const STATUS_BY_TYPE: Record<string, StatusDef[]> = {
   immo: [
-    { label: "Mandat non confirmé", percent: 0 },
-    { label: "Mandat signé", percent: 10 },
-    { label: "Documents reçus", percent: 25 },
-    { label: "Dossier complet", percent: 35 },
-    { label: "Visites en cours", percent: 50 },
-    { label: "Offre acceptée", percent: 70 },
-    { label: "Compromis signé", percent: 80 },
-    { label: "Délai de rétractation", percent: 88 },
-    { label: "Acte signé", percent: 100 },
-  ],
-  of: [
-    { label: "Documents reçus", percent: 0 },
-    { label: "Dossier complet", percent: 15 },
-    { label: "Dépôt effectué auprès du fonds de formation", percent: 30 },
-    { label: "En attente de validation", percent: 45 },
-    { label: "Demande acceptée", percent: 65 },
-    { label: "Documents de fin de formation transmis", percent: 80 },
-    { label: "Remboursement en cours", percent: 90 },
-    { label: "Paiement validé", percent: 100 },
-  ],
-  artisan: [
-    { label: "Devis envoyé", percent: 0  },
-    { label: "Devis accepté", percent: 15 },
-    { label: "Commande matériel", percent: 30 },
-    { label: "Travaux en cours", percent: 45 },
-    { label: "Travaux terminés", percent: 65 },
-    { label: "Visite fin de travaux", percent: 80 },
-    { label: "Facture envoyée", percent: 90 },
-    { label: "Terminé", percent: 100 },
-  ],
-   freelance: [
-    { label: "Devis envoyé", percent: 0 },
-    { label: "Devis accepté", percent: 15 },
-    { label: "Travail en cours", percent: 30 },
-    { label: "Première version livrée", percent: 50 },
-    { label: "Ajustements en cours", percent: 65 },
-    { label: "Facture envoyée", percent: 90 },
-    { label: "Projet terminé", percent: 100 },
-  ],
-  other: [
-    { label: "Documents reçus", percent: 0 },
-    { label: "Dossier complet", percent: 50 },
-    { label: "Terminé", percent: 100 },
+    { label: "Mandat de vente signé", percent: 10 },
+    { label: "Shooting photo réalisé", percent: 20 },
+    { label: "Annonce publiée", percent: 30 },
+    { label: "Visites en cours", percent: 40 },
+    { label: "Offre d'achat acceptée", percent: 55 },
+    { label: "Compromis de vente signé", percent: 70 },
+    { label: "Délai de rétractation purgé", percent: 78 },
+    {
+      label: "Dossier de financement / Prêt accordé",
+      percent: 88,
+    },
+    { label: "État des lieux avant signature", percent: 95 },
+    { label: "Acte authentique signé", percent: 100 },
   ],
 };
 
@@ -87,27 +56,8 @@ function clampPct(n: number | null | undefined) {
   const v = typeof n === "number" ? n : 0;
   return Math.max(0, Math.min(100, Math.round(v)));
 }
-function normalizeType(t: string | null | undefined) {
-  const v = (t ?? "").toLowerCase().trim();
-
-  if (v === "immobilier") return "immo";
-  if (v === "formation") return "of";
-  if (v === "artisan" || v === "artisans") return "artisan";
-
-  if (
-    v === "freelance" ||
-    v === "freelancer" ||
-    v === "freelances" ||
-    v === "free-lance"
-  ) {
-    return "freelance";
-  }
-
-  if (v === "immo" || v === "of" || v === "courtier" || v === "artisan" || v === "freelance") {
-    return v;
-  }
-
-  return "other";
+function normalizeType() {
+  return "immo";
 }
 function normalizePhone(phone: string) {
   return phone.replace(/[^\d+]/g, "");
@@ -192,8 +142,7 @@ export default function ClientTrack({ token }: { token: string }) {
     if (!project) return [];
     if (steps && steps.length > 0) return steps;
 
-    const type = normalizeType(project.project_type);
-    const statuses = STATUS_BY_TYPE[type] ?? STATUS_BY_TYPE.other;
+    const statuses = STATUS_BY_TYPE.immo;
 
     let currentIdx = statuses.findIndex((s) => s.label === (project.status_text ?? ""));
     if (currentIdx < 0) {

@@ -18,12 +18,15 @@ type StatusDef = { label: string; percent: number };
 const STATUS_BY_TYPE: Record<string, StatusDef[]> = {
   immo: [
     { label: "Mandat signé", percent: 10 },
-    { label: "Documents reçus", percent: 25 },
-    { label: "Dossier complet", percent: 35 },
-    { label: "Visites en cours", percent: 50 },
-    { label: "Offre acceptée", percent: 70 },
-    { label: "Compromis signé", percent: 80 },
-    { label: "Acte signé", percent: 100 },
+  { label: "Shooting photo réalisé", percent: 20 },
+  { label: "Annonce publiée", percent: 30 },
+  { label: "Visites en cours", percent: 40 },
+  { label: "Offre acceptée", percent: 50 },
+  { label: "Compromis signé", percent: 60 },
+  { label: "Délai de rétractation purgé", percent: 70 },
+  { label: "Financement / Prêt accordé", percent: 90 }, // Le dossier est quasi-sûr à 100% ici
+  { label: "État des lieux avant signature", percent: 95 },
+  { label: "Acte authentique signé", percent: 100 },
   ],
   of: [
     { label: "Documents reçus", percent: 0 },

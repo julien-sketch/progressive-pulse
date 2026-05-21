@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
+import { IMMO_STEPS } from "@/lib/templates/immo";
 
 type Profile = {
   user_id: string;
@@ -31,69 +32,11 @@ type Project = {
 type StepDef = { label: string };
 
 const STEPS_BY_TYPE: Record<string, StepDef[]> = {
-  immo: [
-    { label: "Mandat signé" },
-    { label: "Shooting photo réalisé" },
-    { label: "Annonce publiée" },
-    { label: "Visites en cours" },
-    { label: "Offre acceptée" },
-    { label: "Compromis signé" },
-    { label: "Délai de rétractation" },
-    { label: "Acte authentique signé" },
-  ],
-  of: [
-    { label: "Documents reçus" },
-    { label: "Dossier complet" },
-    { label: "Dépôt effectué auprès du fonds de formation" },
-    { label: "En attente de validation" },
-    { label: "Demande acceptée" },
-    { label: "Documents de fin de formation transmis" },
-    { label: "Remboursement en cours" },
-    { label: "Paiement validé" },
-  ],
-  courtier: [
-    { label: "Documents reçus" },
-    { label: "Dossier complet" },
-    { label: "Étude / Analyse" },
-    { label: "Dépôt banque" },
-    { label: "Accord de principe" },
-    { label: "Édition offre" },
-    { label: "Signature" },
-    { label: "Déblocage fonds" },
-  ],
-  artisan: [
-    { label: "Devis envoyé" },
-    { label: "Devis accepté" },
-    { label: "Commande matériel" },
-    { label: "Travaux en cours" },
-    { label: "Travaux terminés" },
-    { label: "Visite fin de travaux" },
-    { label: "Facture envoyée" },
-    { label: "Terminé" },
-  ],
-  freelance: [
-    { label: "Devis envoyé" },
-    { label: "Devis accepté" },
-    { label: "Travail en cours" },
-    { label: "Première version livrée" },
-    { label: "Ajustements en cours" },
-    { label: "Facture envoyée" },
-    { label: "Projet terminé" },
-  ],
-  other: [
-    { label: "Documents reçus" },
-    { label: "Dossier complet" },
-    { label: "Terminé" },
-  ],
+  immo: IMMO_STEPS.map((label) => ({ label })),
 };
 
 const PROFESSION_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: "courtier", label: "Courtier" },
   { value: "immo", label: "Agent immobilier" },
-  { value: "of", label: "Organisme de formation" },
-  { value: "artisan", label: "Artisan" },
-  { value: "freelance", label: "Freelance" },
-  { value: "other", label: "Autre" },
 ];
 
 function clampPct(n: number | null | undefined) {
@@ -101,27 +44,8 @@ function clampPct(n: number | null | undefined) {
   return Math.max(0, Math.min(100, Math.round(v)));
 }
 
-function normalizeType(t: string | null | undefined) {
-  const v = (t ?? "").toLowerCase().trim();
-
-  if (v === "immobilier") return "immo";
-  if (v === "formation") return "of";
-  if (v === "artisan" || v === "artisans") return "artisan";
-
-  if (
-    v === "freelance" ||
-    v === "freelancer" ||
-    v === "freelances" ||
-    v === "free-lance"
-  ) {
-    return "freelance";
-  }
-
-  if (v === "immo" || v === "of" || v === "courtier" || v === "artisan" || v === "freelance") {
-    return v;
-  }
-
-  return "other";
+function normalizeType() {
+  return "immo";
 }
 
 function makeAccessToken(clientName: string) {
@@ -158,11 +82,11 @@ export default function ProPage() {
   const [updatingProjectId, setUpdatingProjectId] = useState<string | null>(null);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
 
-  const stripeCheckoutPack5 = `https://buy.stripe.com/dRm14obRfdUkfeJ8kHeIw04?prefilled_email=${encodeURIComponent(
-  userEmail || ""
+  const checkoutSingle = `/checkout?plan=single&email=${encodeURIComponent(
+    userEmail || ""
   )}`;
 
-  const stripeCheckoutPack15 = `https://buy.stripe.com/6oU5kE4oN5nO2rX9oLeIw03?prefilled_email=${encodeURIComponent(
+  const checkoutPack5 = `/checkout?plan=pack5&email=${encodeURIComponent(
     userEmail || ""
   )}`;
 
@@ -257,9 +181,8 @@ export default function ProPage() {
   };
 
   const profileOk =
-    !!profile &&
-    normalizeType(profile.profession) !== "other" &&
-    !!(profile.phone && profile.phone.trim().length >= 6);
+  !!profile &&
+  !!(profile.phone && profile.phone.trim().length >= 6);
 
   const createDossier = async () => {
     if (creating) return;
@@ -367,9 +290,7 @@ export default function ProPage() {
     );
   }
 
-  const metierLabel =
-    PROFESSION_OPTIONS.find((o) => o.value === normalizeType(profile?.profession))?.label ??
-    normalizeType(profile?.profession);
+const metierLabel = "Agent immobilier";
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] px-6 py-8 text-slate-900">
@@ -488,8 +409,8 @@ export default function ProPage() {
 
               <div className="mt-6 space-y-6">
                 {projects.map((p) => {
-                  const t = normalizeType(p.project_type);
-                  const stepsDef = STEPS_BY_TYPE[t] ?? STEPS_BY_TYPE.other;
+                  const t = "immo";
+                  const stepsDef = STEPS_BY_TYPE.immo;
 
                   const progress = clampPct(p.progress_percent);
                   const canUpdate = p.owner_user_id === userId;
@@ -624,21 +545,21 @@ export default function ProPage() {
               <div className="mt-5 grid grid-cols-1 gap-3">
 
                 <a
-                href={stripeCheckoutPack5}
+                href={checkoutSingle}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex w-full items-center justify-center rounded-2xl border border-[#E2E8F0] bg-white px-4 py-3 text-sm font-extrabold transition hover:bg-slate-50"
                 >
-                Acheter 5 dossiers — 69€
+                Acheter 1 dossier — 39€
                 </a>
 
                 <a
-                href={stripeCheckoutPack15}
+                href={checkoutPack5}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex w-full items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#4F46E5_0%,#6366F1_60%,#7C3AED_100%)] px-4 py-3 text-sm font-extrabold text-white shadow-[0_12px_28px_rgba(79,70,229,0.18)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(79,70,229,0.24)] active:translate-y-[1px]"
                 >
-                Acheter 15 dossiers — 149€
+                Acheter 5 dossiers — 149€
                 </a>
 
                 </div>

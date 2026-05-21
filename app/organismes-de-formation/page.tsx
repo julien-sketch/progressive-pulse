@@ -970,19 +970,19 @@ export default function OrganismesDeFormationPage() {
                   {
                     m: "Dossier individuel",
                     g: "500€ – 2 000€",
-                    c: "19€",
+                    c: "39€",
                     r: "Très faible",
                   },
                   {
                     m: "Dossier financé",
                     g: "1 000€ – 5 000€",
-                    c: "19€",
+                    c: "39€",
                     r: "Quasi négligeable",
                   },
                   {
                     m: "Volume récurrent",
                     g: "Variable",
-                    c: "69€ / 5 dossiers",
+                    c: "149€ / 5 dossiers",
                     r: "Très rentable",
                   },
                 ].map((row, i) => (
@@ -1011,7 +1011,7 @@ export default function OrganismesDeFormationPage() {
           </div>
 
           <p className="mt-8 text-center font-semibold italic text-slate-500">
-            “À 19€, ce n’est pas une dépense.
+            “À 39€, ce n’est pas une dépense.
             <span className="font-extrabold not-italic text-slate-900">
               {" "}
               C’est un amortisseur de friction.
@@ -1090,21 +1090,21 @@ export default function OrganismesDeFormationPage() {
               </div>
               <div className="rounded-[20px] border border-slate-200 bg-white p-7">
                 <div className="mb-1 text-sm font-extrabold text-slate-900">
-                  Pro
+                  Pack Pro
                 </div>
                 <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-extrabold text-emerald-600 ring-1 ring-emerald-100">
-                  Économisez 31%
+                  29,80€ par dossier
                 </div>
                 <div className="mb-1 flex items-end gap-1.5">
                   <div className="text-5xl font-extrabold tracking-tight text-slate-900">
-                    69€
+                    149€
                   </div>
                   <div className="pb-2 text-sm font-extrabold text-slate-500">
                     HT
                   </div>
                 </div>
                 <div className="mb-6 text-xs font-semibold text-slate-500">
-                  13,80€ par dossier
+                  29,80€ par dossier
                 </div>
                 <div className="mb-0.5 text-2xl font-extrabold text-slate-900">
                   5 dossiers
@@ -1127,7 +1127,7 @@ export default function OrganismesDeFormationPage() {
                   ))}
                 </ul>
                 <a
-                  href="/signup"
+                  href="/checkout?plan=pack5"
                   className="inline-flex w-full items-center justify-center rounded-2xl bg-slate-900 px-6 py-4 text-sm font-extrabold text-white shadow-[0_12px_28px_rgba(15,23,42,0.18)] transition-all hover:-translate-y-0.5"
                 >
                   Réserver mes crédits →
@@ -1137,24 +1137,24 @@ export default function OrganismesDeFormationPage() {
 
             <div className="rounded-3xl border border-slate-200 bg-white p-7 shadow-[0_4px_24px_rgba(15,23,42,0.05)]">
               <div className="mb-1 text-sm font-extrabold text-slate-900">
-                Business
+                  Standard
               </div>
               <div className="mb-5 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-extrabold text-emerald-600 ring-1 ring-emerald-100">
-                Économisez 48%
+                1 dossier complet
               </div>
               <div className="mb-1 flex items-end gap-1.5">
                 <div className="text-5xl font-extrabold tracking-tight text-slate-900">
-                  149€
+                  39€
                 </div>
                 <div className="pb-2 text-sm font-extrabold text-slate-500">
                   HT
                 </div>
               </div>
               <div className="mb-6 text-xs font-semibold text-slate-500">
-                9,93€ par dossier
+                1 dossier complet
               </div>
               <div className="mb-0.5 text-2xl font-extrabold text-slate-900">
-                15 dossiers
+                1 dossier
               </div>
               <div className="mb-6 text-sm font-semibold text-slate-400">
                 Crédits sans expiration
@@ -1162,9 +1162,9 @@ export default function OrganismesDeFormationPage() {
               <div className="mb-6 h-px bg-slate-200" />
               <ul className="mb-8 space-y-3 text-sm font-semibold text-slate-600">
                 {[
-                  "Tout du pack Pro",
-                  "Volume plus rentable",
-                  "Utilisation souple",
+                  "Tout du pack Découverte",
+                  "Mises à jour illimitées",
+                  "Paiement à l’usage",
                 ].map((item) => (
                   <li key={item} className="flex items-center gap-2">
                     <span className="size-2 rounded-full bg-slate-900" />
@@ -1173,7 +1173,7 @@ export default function OrganismesDeFormationPage() {
                 ))}
               </ul>
               <a
-                href="/signup"
+                href="/checkout?plan=single"
                 className="inline-flex w-full items-center justify-center rounded-2xl border border-slate-200 px-6 py-4 text-sm font-extrabold text-slate-900 transition hover:bg-slate-50"
               >
                 Réserver mes crédits →

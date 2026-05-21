@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { getCreditsForPriceId } from "@/lib/pricing";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -120,7 +121,7 @@ export async function POST(req: Request) {
 
   // 3) Déterminer le nombre de crédits à ajouter
   // Priorité à metadata.credits du Price
-  // Fallback éventuel : session.metadata.credits
+  // Fallbacks : mapping priceId, puis session.metadata.credits
   let creditsToAdd = 0;
 
   try {
@@ -134,8 +135,9 @@ export async function POST(req: Request) {
       const qty = item.quantity || 1;
       const priceObj = item.price as Stripe.Price | null;
       const creditsMeta = priceObj?.metadata?.credits;
+      const priceCredits = getCreditsForPriceId(priceObj?.id);
 
-      const creditsPerUnit = creditsMeta ? toInt(creditsMeta) : 0;
+      const creditsPerUnit = creditsMeta ? toInt(creditsMeta) : priceCredits;
       creditsToAdd += creditsPerUnit * qty;
     }
   } catch (e) {
@@ -149,7 +151,7 @@ export async function POST(req: Request) {
 
   if (creditsToAdd <= 0) {
     return new NextResponse(
-      "Could not determine credits to add (missing metadata.credits on Price)",
+      "Could not determine credits to add (missing Price metadata or pricing mapping)",
       { status: 400 }
     );
   }

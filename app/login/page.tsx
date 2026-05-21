@@ -7,12 +7,9 @@ import { ArrowLeft } from "lucide-react";
 type Mode = "password" | "signup";
 
 const PROFESSION_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: "courtier", label: "Courtier" },
   { value: "immo", label: "Agent immobilier" },
   { value: "of", label: "Organisme de formation" },
-  { value: "artisan", label: "Artisan" },
-  { value: "freelance", label: "Freelance" },
-  { value: "other", label: "Autre" },
+
 ];
 
 export default function LoginPage() {
@@ -34,7 +31,7 @@ export default function LoginPage() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
-  const [profession, setProfession] = useState("courtier");
+const [profession, setProfession] = useState("immo");
   const [loadingSignup, setLoadingSignup] = useState(false);
 
   const loginPassword = async (e: React.FormEvent) => {
