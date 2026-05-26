@@ -40,7 +40,14 @@ export default function CheckoutPage() {
         body: JSON.stringify({ plan }),
       });
 
-      const data = await res.json();
+      const text = await res.text();
+
+let data: any = {};
+try {
+  data = text ? JSON.parse(text) : {};
+} catch {
+  data = { error: text || "Erreur serveur inconnue." };
+}
 
       if (!res.ok || !data.url) {
         setMessage(data.error || "Erreur lors de la création du paiement.");
