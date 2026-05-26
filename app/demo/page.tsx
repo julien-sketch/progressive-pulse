@@ -17,7 +17,7 @@ type StatusDef = { label: string; percent: number };
 
 const STATUS_BY_TYPE: Record<string, StatusDef[]> = {
   immo: [
-    { label: "Mandat signé", percent: 10 },
+    { label: "Mandat de vente signé", percent: 10 },
   { label: "Shooting photo réalisé", percent: 20 },
   { label: "Annonce publiée", percent: 30 },
   { label: "Visites en cours", percent: 40 },

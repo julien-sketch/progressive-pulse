@@ -361,7 +361,7 @@ const jobs = [
 const useCases = [
   {
     icon: Home,
-    title: "Mandat signé",
+    title: "Mandat de vente signé",
     desc: "Le client sait que le dossier est bien lancé dès le départ.",
   },
   {
