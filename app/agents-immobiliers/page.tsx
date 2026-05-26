@@ -601,7 +601,7 @@ export default function AgentsImmobiliersPage() {
 
                   <div className="space-y-2">
                     {([
-                      ["Mandat signé", true, false],
+                      ["Mandat de vente signé", true, false],
                       ["Shooting photo réalisé", true, false],
                       ["Annonce publiée", true, false],
                       ["Visites en cours", false, true], // Étape en cours actuelle
