@@ -9,6 +9,19 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 const MAX_AGE_SECONDS = 7 * 24 * 60 * 60; // 7 jours
 
+const IMMO_PROGRESS: Record<string, number> = {
+  "Mandat de vente signé": 10,
+  "Shooting photo réalisé": 20,
+  "Annonce publiée": 30,
+  "Visites en cours": 40,
+  "Offre d'achat acceptée": 55,
+  "Compromis de vente signé": 70,
+  "Délai de rétractation purgé": 78,
+  "Dossier de financement / Prêt accordé": 88,
+  "État des lieux avant signature": 95,
+  "Acte authentique signé": 100,
+};
+
 function env(name: string, required = true): string {
   const v = process.env[name];
   if (!v && required) throw new Error(`Missing env var: ${name}`);
@@ -20,7 +33,6 @@ function badRequest(msg: string, status = 400) {
 }
 
 function safeEqualHex(a: string, b: string) {
-  // compare constant-time
   try {
     const ba = Buffer.from(a, "hex");
     const bb = Buffer.from(b, "hex");
@@ -32,7 +44,6 @@ function safeEqualHex(a: string, b: string) {
 }
 
 function canonicalQuery(params: Record<string, string>) {
-  // ordre stable (important pour la signature)
   const keys = Object.keys(params).sort();
   return keys.map((k) => `${k}=${encodeURIComponent(params[k])}`).join("&");
 }
@@ -43,7 +54,6 @@ function computeSig(canonical: string) {
 }
 
 function verifySignedLink(url: URL) {
-  // paramètres attendus
   const token = String(url.searchParams.get("token") ?? "").trim();
   const stepStr = String(url.searchParams.get("step") ?? "").trim();
   const tsStr = String(url.searchParams.get("ts") ?? "").trim();
@@ -53,17 +63,20 @@ function verifySignedLink(url: URL) {
   const ts = Number(tsStr);
 
   if (!token) return { ok: false as const, error: "Missing token" };
-  if (!Number.isFinite(step) || step < 1) return { ok: false as const, error: "Invalid step" };
-  if (!Number.isFinite(ts) || ts <= 0) return { ok: false as const, error: "Missing/invalid ts" };
+  if (!Number.isFinite(step) || step < 1)
+    return { ok: false as const, error: "Invalid step" };
+  if (!Number.isFinite(ts) || ts <= 0)
+    return { ok: false as const, error: "Missing/invalid ts" };
   if (!sig) return { ok: false as const, error: "Missing sig" };
 
-  // expiration
   const nowSec = Math.floor(Date.now() / 1000);
   const age = nowSec - ts;
-  if (age < -60) return { ok: false as const, error: "Link timestamp is in the future" }; // tolérance 60s
-  if (age > MAX_AGE_SECONDS) return { ok: false as const, error: "Link expired" };
 
-  // vérif signature
+  if (age < -60)
+    return { ok: false as const, error: "Link timestamp is in the future" };
+  if (age > MAX_AGE_SECONDS)
+    return { ok: false as const, error: "Link expired" };
+
   const canonical = canonicalQuery({ token, step: String(step), ts: String(ts) });
   const expected = computeSig(canonical);
 
@@ -77,12 +90,9 @@ function verifySignedLink(url: URL) {
 export async function GET(req: Request) {
   const url = new URL(req.url);
 
-  // 🔒 EXIGE signature + ts
   const v = verifySignedLink(url);
+
   if (!v.ok) {
-    // Option compat (DÉCONSEILLÉE) :
-    // Si tu veux temporairement accepter les anciens liens non signés,
-    // remplace ce return par un fallback sur l’ancienne logique.
     return badRequest(v.error, 401);
   }
 
@@ -91,14 +101,13 @@ export async function GET(req: Request) {
 
   const { data: project, error: projectError } = await supabase
     .from("projects")
-    .select("id, access_token")
+    .select("id, access_token, project_type")
     .eq("access_token", token)
     .maybeSingle();
 
   if (projectError) return badRequest(projectError.message, 400);
   if (!project) return badRequest("Not found", 404);
 
-  // Récupère total steps
   const { data: steps, error: stepsError } = await supabase
     .from("project_steps")
     .select("order_index, label")
@@ -110,31 +119,33 @@ export async function GET(req: Request) {
   const total = steps?.length ?? 0;
   if (!total) return badRequest("No steps for this project", 400);
 
-  // Clamp step to [1..total]
   const target = Math.max(1, Math.min(step, total));
-
-  // Update steps: <= target true, > target false
   const nowIso = new Date().toISOString();
 
-  const { error: up1 } = await supabase
+  const { error: upCompleted } = await supabase
     .from("project_steps")
     .update({ is_completed: true, completed_at: nowIso })
     .eq("project_id", project.id)
     .lte("order_index", target);
 
-  if (up1) return badRequest(up1.message, 400);
+  if (upCompleted) return badRequest(upCompleted.message, 400);
 
-  const { error: up2 } = await supabase
+  const { error: upPending } = await supabase
     .from("project_steps")
     .update({ is_completed: false, completed_at: null })
     .eq("project_id", project.id)
     .gt("order_index", target);
 
-  if (up2) return badRequest(up2.message, 400);
+  if (upPending) return badRequest(upPending.message, 400);
 
-  const progress = Math.round((target / total) * 100);
   const status_text =
-    steps?.find((s) => s.order_index === target)?.label ?? `Étape ${target}/${total}`;
+    steps?.find((s) => s.order_index === target)?.label ??
+    `Étape ${target}/${total}`;
+
+  const progress =
+    project.project_type === "immo"
+      ? IMMO_PROGRESS[status_text] ?? Math.round((target / total) * 100)
+      : Math.round((target / total) * 100);
 
   const { error: upProject } = await supabase
     .from("projects")
@@ -147,8 +158,6 @@ export async function GET(req: Request) {
 
   if (upProject) return badRequest(upProject.message, 400);
 
-  // Page de confirmation
-  // ⚠️ Je garde ton lien, adapte si ta vraie URL client est /d/[token] ou /track/[token]
   const html = `<!doctype html>
 <html lang="fr">
 <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
