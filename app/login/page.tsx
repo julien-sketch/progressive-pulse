@@ -69,11 +69,9 @@ const [profession, setProfession] = useState("immo");
     setInfo(null);
     setResetLoading(true);
 
-    const origin = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
-
-    const { error } = await supabase.auth.resetPasswordForEmail(eEmail, {
-      redirectTo: `${origin}/reset-password`,
-    });
+   const { error } = await supabase.auth.resetPasswordForEmail(eEmail, {
+  redirectTo: "https://www.progressive-pulse.fr/reset-password",
+});
 
     setResetLoading(false);
 

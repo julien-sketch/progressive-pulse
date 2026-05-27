@@ -5,10 +5,6 @@ export const revalidate = 0;
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { IMMO_STEPS } from "@/lib/templates/immo";
-import { OF_STEPS } from "@/lib/templates/of";
-
-
-type ProjectType = "immo" | "of";
 
 function slugify(input: string) {
   return input
@@ -35,6 +31,7 @@ async function generateUniqueToken(
 
     if (!data) return token;
   }
+
   return `${base}-${Date.now()}`;
 }
 
@@ -46,8 +43,6 @@ export async function POST(req: Request) {
   const client_name = String(body?.client_name ?? "").trim();
   const broker_email = String(body?.broker_email ?? "").trim();
   const property_name = String(body?.property_name ?? "").trim();
-  const project_type = (String(body?.project_type ?? "immo").trim() ||
-    "immo") as ProjectType;
 
   if (!client_name || !broker_email) {
     return NextResponse.json(
@@ -56,19 +51,10 @@ export async function POST(req: Request) {
     );
   }
 
-  const allowed: ProjectType[] = ["immo", "of"];
-  const safeType: ProjectType = allowed.includes(project_type)
-    ? project_type
-    : "immo";
-
   const base = slugify(property_name || client_name || "dossier");
   const token = await generateUniqueToken(supabase, base);
 
-  // Valeurs par défaut selon type
-  const defaultStatus =
-  safeType === "immo"
-    ? IMMO_STEPS[0]
-    : OF_STEPS[0];
+  const defaultStatus = IMMO_STEPS[0];
 
   const { data: inserted, error: insertError } = await supabase
     .from("projects")
@@ -77,8 +63,8 @@ export async function POST(req: Request) {
         client_name,
         broker_email,
         access_token: token,
-        project_type: safeType,
-        progress_percent: 0,
+        project_type: "immo",
+        progress_percent: 10,
         status_text: defaultStatus,
         updated_at: new Date().toISOString(),
       },
@@ -93,13 +79,13 @@ export async function POST(req: Request) {
     );
   }
 
-const templateSteps = IMMO_STEPS;
-const stepsRows = templateSteps.map((label, index) => ({
-  project_id: inserted.id,
-  order_index: index + 1,
-  label,
-  is_completed: index === 0,
-}));
+  const stepsRows = IMMO_STEPS.map((label, index) => ({
+    project_id: inserted.id,
+    order_index: index + 1,
+    label,
+    is_completed: index === 0,
+    completed_at: index === 0 ? new Date().toISOString() : null,
+  }));
 
   const { error: stepsError } = await supabase
     .from("project_steps")
