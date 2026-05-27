@@ -5,20 +5,14 @@ import Link from "next/link";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 
 type ProfessionValue =
-  | "courtier"
+ 
   | "immo"
-  | "of"
-  | "artisan"
-  | "freelance"
-  | "other";
+
 
 const PROFESSION_OPTIONS: Array<{ value: ProfessionValue; label: string }> = [
-  { value: "courtier", label: "Courtier" },
+
   { value: "immo", label: "Agent immobilier" },
-  { value: "of", label: "Organisme de formation" },
-  { value: "artisan", label: "Artisan" },
-  { value: "freelance", label: "Freelance" },
-  { value: "other", label: "Autre" },
+
 ];
 
 export default function SignupPage() {
